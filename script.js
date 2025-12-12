@@ -25,7 +25,7 @@ const INITIAL_TIMETABLE = {
     ]
 };
 
-// State management
+// State management - IN MEMORY ONLY (no localStorage)
 var timetable = {};
 var assessments = {};
 var changelog = [];
@@ -35,14 +35,13 @@ var editingCard = null;
 var editingDay = null;
 var editingAssessment = null;
 var editingStatus = null;
-var history = [];
+var undoHistory = [];
 var historyIndex = -1;
 var MAX_HISTORY = 50;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
     loadState();
-    checkWeeklyReset();
     setupEventListeners();
     renderTimetable();
     renderAssessments();
@@ -53,36 +52,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Load state
 function loadState() {
-    var saved = localStorage.getItem('universityTimetable');
-    timetable = saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(INITIAL_TIMETABLE));
-    
-    saved = localStorage.getItem('universityAssessments');
-    assessments = saved ? JSON.parse(saved) : { todo: [], inprogress: [], extension: [], completed: [] };
-    
-    saved = localStorage.getItem('universityChangelog');
-    changelog = saved ? JSON.parse(saved) : [];
-    
-    darkMode = localStorage.getItem('universityDarkMode') === 'true';
-    sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-    
-    if (darkMode) {
-        document.body.classList.add('dark-mode');
-        document.getElementById('sunIcon').classList.add('hidden');
-        document.getElementById('moonIcon').classList.remove('hidden');
-    }
-    
-    if (sidebarCollapsed) {
-        document.getElementById('sidebar').classList.add('collapsed');
-    }
-}
-
-// Save state
-function saveState() {
-    localStorage.setItem('universityTimetable', JSON.stringify(timetable));
-    localStorage.setItem('universityAssessments', JSON.stringify(assessments));
-    localStorage.setItem('universityChangelog', JSON.stringify(changelog));
-    localStorage.setItem('universityDarkMode', darkMode);
-    localStorage.setItem('sidebarCollapsed', sidebarCollapsed);
+    timetable = JSON.parse(JSON.stringify(INITIAL_TIMETABLE));
+    assessments = { todo: [], inprogress: [], extension: [], completed: [] };
+    changelog = [];
+    darkMode = false;
+    sidebarCollapsed = false;
 }
 
 // History management
@@ -92,11 +66,11 @@ function saveToHistory() {
         assessments: JSON.parse(JSON.stringify(assessments))
     };
     
-    history = history.slice(0, historyIndex + 1);
-    history.push(state);
+    undoHistory = undoHistory.slice(0, historyIndex + 1);
+    undoHistory.push(state);
     
-    if (history.length > MAX_HISTORY) {
-        history.shift();
+    if (undoHistory.length > MAX_HISTORY) {
+        undoHistory.shift();
     } else {
         historyIndex++;
     }
@@ -107,10 +81,9 @@ function saveToHistory() {
 function undo() {
     if (historyIndex > 0) {
         historyIndex--;
-        var state = history[historyIndex];
+        var state = undoHistory[historyIndex];
         timetable = JSON.parse(JSON.stringify(state.timetable));
         assessments = JSON.parse(JSON.stringify(state.assessments));
-        saveState();
         renderTimetable();
         renderAssessments();
         updateUndoRedoButtons();
@@ -119,12 +92,11 @@ function undo() {
 }
 
 function redo() {
-    if (historyIndex < history.length - 1) {
+    if (historyIndex < undoHistory.length - 1) {
         historyIndex++;
-        var state = history[historyIndex];
+        var state = undoHistory[historyIndex];
         timetable = JSON.parse(JSON.stringify(state.timetable));
         assessments = JSON.parse(JSON.stringify(state.assessments));
-        saveState();
         renderTimetable();
         renderAssessments();
         updateUndoRedoButtons();
@@ -134,30 +106,7 @@ function redo() {
 
 function updateUndoRedoButtons() {
     document.getElementById('undoBtn').disabled = historyIndex <= 0;
-    document.getElementById('redoBtn').disabled = historyIndex >= history.length - 1;
-}
-
-// Weekly reset check
-function checkWeeklyReset() {
-    var lastReset = localStorage.getItem('lastTimetableReset');
-    var now = new Date();
-    var aestOffset = 10 * 60;
-    var localOffset = now.getTimezoneOffset();
-    var aestTime = new Date(now.getTime() + (aestOffset + localOffset) * 60000);
-    var currentDay = aestTime.getDay();
-    
-    if (lastReset) {
-        var lastResetDate = new Date(parseInt(lastReset));
-        var lastResetAEST = new Date(lastResetDate.getTime() + (aestOffset + localOffset) * 60000);
-        var daysSinceLastReset = Math.floor((aestTime - lastResetAEST) / (1000 * 60 * 60 * 24));
-        
-        if (currentDay === 0 && daysSinceLastReset >= 7) {
-            resetTimetable(true);
-            localStorage.setItem('lastTimetableReset', now.getTime().toString());
-        }
-    } else {
-        localStorage.setItem('lastTimetableReset', now.getTime().toString());
-    }
+    document.getElementById('redoBtn').disabled = historyIndex >= undoHistory.length - 1;
 }
 
 // Time parsing
@@ -240,8 +189,6 @@ function logEvent(summary, details, timestamp) {
     if (changelog.length > 100) {
         changelog = changelog.slice(0, 100);
     }
-    
-    saveState();
 }
 
 // Event listeners
@@ -249,7 +196,6 @@ function setupEventListeners() {
     document.getElementById('sidebarToggle').addEventListener('click', function() {
         sidebarCollapsed = !sidebarCollapsed;
         document.getElementById('sidebar').classList.toggle('collapsed');
-        saveState();
     });
     
     document.getElementById('themeToggle').addEventListener('click', function() {
@@ -257,7 +203,6 @@ function setupEventListeners() {
         document.body.classList.toggle('dark-mode');
         document.getElementById('sunIcon').classList.toggle('hidden');
         document.getElementById('moonIcon').classList.toggle('hidden');
-        saveState();
         logEvent('Theme changed', 'Switched to ' + (darkMode ? 'dark' : 'light') + ' mode', new Date().toLocaleString());
     });
     
@@ -324,7 +269,6 @@ function setupEventListeners() {
                 saveToHistory();
                 var cardIndex = timetable[editingDay].findIndex(function(c) { return c.id === editingCard.id; });
                 timetable[editingDay][cardIndex].color = color;
-                saveState();
                 renderTimetable();
                 logEvent('Color changed', editingCard.title + ' color changed to ' + color + ' in ' + editingDay, new Date().toLocaleString());
             }
@@ -336,7 +280,6 @@ function setupEventListeners() {
             saveToHistory();
             var cardTitle = editingCard.title;
             timetable[editingDay] = timetable[editingDay].filter(function(c) { return c.id !== editingCard.id; });
-            saveState();
             renderTimetable();
             closeModal();
             logEvent('Card deleted', cardTitle + ' was deleted from ' + editingDay, new Date().toLocaleString());
@@ -348,7 +291,6 @@ function setupEventListeners() {
             saveToHistory();
             var title = editingAssessment.title;
             assessments[editingStatus] = assessments[editingStatus].filter(function(a) { return a.id !== editingAssessment.id; });
-            saveState();
             renderAssessments();
             closeAssessmentModal();
             logEvent('Assessment deleted', title + ' was deleted from ' + editingStatus, new Date().toLocaleString());
@@ -365,7 +307,6 @@ function setupEventListeners() {
     document.getElementById('clearChangelog').addEventListener('click', function() {
         if (confirm('Clear changelog?')) {
             changelog = [];
-            saveState();
             renderChangelog();
             logEvent('Changelog cleared', 'All entries cleared', new Date().toLocaleString());
         }
@@ -373,7 +314,7 @@ function setupEventListeners() {
     
     document.getElementById('clearHistory').addEventListener('click', function() {
         if (confirm('Clear undo/redo history?')) {
-            history = [];
+            undoHistory = [];
             historyIndex = -1;
             updateUndoRedoButtons();
             logEvent('History cleared', 'Undo/redo history cleared', new Date().toLocaleString());
@@ -384,7 +325,6 @@ function setupEventListeners() {
 // Functions
 function resetTimetable(isAutomatic) {
     timetable = JSON.parse(JSON.stringify(INITIAL_TIMETABLE));
-    saveState();
     renderTimetable();
     logEvent('Timetable reset', isAutomatic ? 'Automatic weekly reset (Sunday 12am AEST)' : 'Manual reset', new Date().toLocaleString());
 }
@@ -400,7 +340,6 @@ function addNewCard(day) {
         notes: ''
     };
     timetable[day] = sortCardsByTime(timetable[day].concat([newCard]));
-    saveState();
     renderTimetable();
     logEvent('Card added', 'New Event added to ' + day, new Date().toLocaleString());
 }
@@ -416,7 +355,6 @@ function addNewAssessment(status) {
     };
     assessments[status].push(newAssessment);
     assessments[status] = sortAssessmentsByUrgency(assessments[status]);
-    saveState();
     renderAssessments();
     logEvent('Assessment added', 'New Assessment added to ' + status, new Date().toLocaleString());
 }
@@ -429,7 +367,6 @@ function updateEditingCard() {
     timetable[editingDay][cardIndex].location = document.getElementById('editLocation').value;
     timetable[editingDay][cardIndex].notes = document.getElementById('editNotes').value;
     timetable[editingDay] = sortCardsByTime(timetable[editingDay]);
-    saveState();
     renderTimetable();
 }
 
@@ -441,7 +378,6 @@ function updateEditingAssessment() {
     assessments[editingStatus][idx].dueDate = document.getElementById('editAssessmentDue').value;
     assessments[editingStatus][idx].notes = document.getElementById('editAssessmentNotes').value;
     assessments[editingStatus] = sortAssessmentsByUrgency(assessments[editingStatus]);
-    saveState();
     renderAssessments();
 }
 
@@ -516,7 +452,6 @@ function renderTimetable() {
                 saveToHistory();
                 timetable[fromDay] = timetable[fromDay].filter(function(c) { return c.id !== card.id; });
                 timetable[day] = sortCardsByTime(timetable[day].concat([card]));
-                saveState();
                 renderTimetable();
                 logEvent('Card moved', card.title + ' moved from ' + fromDay + ' to ' + day + ' at ' + card.time, new Date().toLocaleString());
             }
@@ -567,7 +502,6 @@ function renderAssessments() {
                 saveToHistory();
                 assessments[fromStatus] = assessments[fromStatus].filter(function(a) { return a.id !== assessment.id; });
                 assessments[status] = sortAssessmentsByUrgency(assessments[status].concat([assessment]));
-                saveState();
                 renderAssessments();
                 logEvent('Assessment moved', assessment.title + ' moved from ' + fromStatus + ' to ' + status, new Date().toLocaleString());
             }

@@ -8,12 +8,64 @@
 </head>
 <body>
     <div id="app">
-        <div class="container">
-            <!-- Header -->
-            <div class="header">
-                <h1 class="title">University Hub</h1>
-                <button id="themeToggle" class="theme-toggle">
-                    <svg id="sunIcon" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <!-- Sidebar -->
+        <div id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="sidebar-title">
+                    <span class="title-full">University Hub</span>
+                    <span class="title-short hidden">UH</span>
+                </h1>
+                <button id="sidebarToggle" class="sidebar-toggle">
+                    <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-tab="timetable">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <span class="nav-text">Timetable</span>
+                </button>
+
+                <button class="nav-item" data-tab="assessments">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    <span class="nav-text">Assessments</span>
+                </button>
+
+                <button class="nav-item" data-tab="settings">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M12 1v6m0 6v6m8.66-11a9 9 0 01-17.32 0m17.32 6a9 9 0 01-17.32 0"></path>
+                    </svg>
+                    <span class="nav-text">Settings</span>
+                </button>
+
+                <button class="nav-item" data-tab="changelog">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                    <span class="nav-text">Changelog</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button id="themeToggle" class="theme-toggle-sidebar">
+                    <svg id="sunIcon" class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="5"></circle>
                         <line x1="12" y1="1" x2="12" y2="3"></line>
                         <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -24,21 +76,34 @@
                         <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
                         <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
                     </svg>
-                    <svg id="moonIcon" class="icon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <svg id="moonIcon" class="icon-small hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                     </svg>
+                    <span class="nav-text">Theme</span>
                 </button>
             </div>
+        </div>
 
-            <!-- Tabs -->
-            <div class="tabs">
-                <button class="tab active" data-tab="timetable">Timetable</button>
-                <button class="tab" data-tab="assessments">Assessments</button>
-                <button class="tab" data-tab="settings">Settings</button>
-                <button class="tab" data-tab="changelog">Changelog</button>
+        <!-- Main Content -->
+        <div id="mainContent" class="main-content">
+            <div class="top-bar">
+                <div class="undo-redo-container">
+                    <button id="undoBtn" class="action-btn" title="Undo" disabled>
+                        <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 7v6h6"></path>
+                            <path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"></path>
+                        </svg>
+                    </button>
+                    <button id="redoBtn" class="action-btn" title="Redo" disabled>
+                        <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 7v6h-6"></path>
+                            <path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
 
-            <!-- Tab Content -->
+            <!-- Timetable Content -->
             <div id="timetableContent" class="tab-content active">
                 <div class="timetable-grid">
                     <div class="day-column" data-day="Monday">
@@ -95,21 +160,74 @@
                 </div>
             </div>
 
+            <!-- Assessments Content -->
             <div id="assessmentsContent" class="tab-content">
-                <div class="content-box">
-                    <h2>Assessments</h2>
-                    <p>Add your upcoming assessments and deadlines here.</p>
+                <div class="assessments-grid">
+                    <div class="assessment-column" data-status="todo">
+                        <div class="day-header">
+                            <h2>To-Do</h2>
+                            <button class="add-assessment-btn" data-status="todo">
+                                <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="cards-container" id="todo-assessments"></div>
+                    </div>
+
+                    <div class="assessment-column" data-status="inprogress">
+                        <div class="day-header">
+                            <h2>In Progress</h2>
+                            <button class="add-assessment-btn" data-status="inprogress">
+                                <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="cards-container" id="inprogress-assessments"></div>
+                    </div>
+
+                    <div class="assessment-column" data-status="extension">
+                        <div class="day-header">
+                            <h2>Extension Required</h2>
+                            <button class="add-assessment-btn" data-status="extension">
+                                <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="cards-container" id="extension-assessments"></div>
+                    </div>
+
+                    <div class="assessment-column" data-status="completed">
+                        <div class="day-header">
+                            <h2>Completed</h2>
+                            <button class="add-assessment-btn" data-status="completed">
+                                <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="cards-container" id="completed-assessments"></div>
+                    </div>
                 </div>
             </div>
 
+            <!-- Settings Content -->
             <div id="settingsContent" class="tab-content">
                 <div class="content-box">
                     <h2>Settings</h2>
                     <button id="resetTimetable" class="btn-danger">Reset Timetable</button>
                     <button id="clearChangelog" class="btn-danger" style="margin-left: 10px;">Clear Changelog</button>
+                    <button id="clearHistory" class="btn-danger" style="margin-left: 10px;">Clear Undo/Redo History</button>
                 </div>
             </div>
 
+            <!-- Changelog Content -->
             <div id="changelogContent" class="tab-content">
                 <div class="content-box">
                     <h2>Changelog</h2>
@@ -119,7 +237,7 @@
         </div>
     </div>
 
-    <!-- Edit Modal -->
+    <!-- Edit Timetable Card Modal -->
     <div id="editModal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
@@ -161,6 +279,40 @@
                     </div>
                 </div>
                 <button id="deleteCard" class="btn-danger full-width">Delete Card</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Assessment Modal -->
+    <div id="editAssessmentModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Assessment</h3>
+                <button id="closeAssessmentModal" class="close-btn">
+                    <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" id="editAssessmentTitle" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Course</label>
+                    <input type="text" id="editAssessmentCourse" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Due Date</label>
+                    <input type="datetime-local" id="editAssessmentDue" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="editAssessmentNotes" class="form-input" rows="3"></textarea>
+                </div>
+                <button id="deleteAssessment" class="btn-danger full-width">Delete Assessment</button>
             </div>
         </div>
     </div>

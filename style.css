@@ -347,17 +347,55 @@ body.dark-mode .theme-toggle-sidebar {
     opacity: 0.5;
 }
 
-.card-grip {
+.card-header-actions {
     position: absolute;
     top: 8px;
     right: 8px;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.pin-btn {
+    background: transparent;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
     opacity: 0;
     transition: opacity 0.2s;
     color: #4b5563;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pin-btn:hover {
+    color: #1f2937;
+}
+
+.pinned-card .pin-btn {
+    opacity: 1 !important;
+    color: #3b82f6;
+}
+
+.pinned-card {
+    border: 2px solid #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.card-grip {
+    opacity: 0;
+    transition: opacity 0.2s;
+    color: #4b5563;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .timetable-card:hover .card-grip,
-.assessment-card:hover .card-grip {
+.assessment-card:hover .card-grip,
+.timetable-card:hover .pin-btn,
+.assessment-card:hover .pin-btn {
     opacity: 1;
 }
 
@@ -421,6 +459,14 @@ body.dark-mode .urgency-red { background-color: var(--color-red-dark); }
 
     .card-grip {
         opacity: 0.3;
+    }
+    
+    .pin-btn {
+        opacity: 0.5;
+    }
+    
+    .pinned-card .pin-btn {
+        opacity: 1 !important;
     }
 
     .nav-item {

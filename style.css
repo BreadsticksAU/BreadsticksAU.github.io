@@ -51,6 +51,15 @@ body {
     transition: background-color 0.3s, color 0.3s;
     min-height: 100vh;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Prevent text size adjustment on mobile */
+    -webkit-text-size-adjust: 100%;
+    -moz-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /* Improve touch scrolling on iOS */
+    -webkit-overflow-scrolling: touch;
 }
 
 #app {
@@ -227,6 +236,12 @@ body.dark-mode .theme-toggle-sidebar {
     color: var(--text-primary);
     cursor: pointer;
     transition: all 0.2s;
+    /* Better touch targets */
+    min-width: 40px;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .action-btn:hover:not(:disabled) {
@@ -320,6 +335,11 @@ body.dark-mode .theme-toggle-sidebar {
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
     position: relative;
+    /* Better touch interaction */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .timetable-card:hover,
@@ -400,6 +420,29 @@ body.dark-mode .urgency-green { background-color: var(--color-green-dark); }
 body.dark-mode .urgency-yellow { background-color: var(--color-yellow-dark); }
 body.dark-mode .urgency-orange { background-color: var(--color-orange-dark); }
 body.dark-mode .urgency-red { background-color: var(--color-red-dark); }
+
+/* Mobile-friendly improvements */
+@media (hover: none) and (pointer: coarse) {
+    /* Touch devices - remove hover effects that don't work well */
+    .timetable-card:hover,
+    .assessment-card:hover {
+        transform: none;
+    }
+
+    /* Always show grip on touch devices */
+    .card-grip {
+        opacity: 0.3;
+    }
+
+    /* Larger tap targets */
+    .nav-item {
+        padding: 16px 20px;
+    }
+
+    .close-btn {
+        padding: 8px;
+    }
+}
 
 .content-box {
     background-color: var(--bg-card);
@@ -649,5 +692,122 @@ body.dark-mode .color-btn[data-color="pink"] { background-color: var(--color-pin
     .timetable-grid,
     .assessments-grid {
         grid-template-columns: 1fr;
+    }
+
+    /* Make buttons and touch targets larger */
+    .add-card-btn,
+    .add-assessment-btn {
+        padding: 8px;
+    }
+
+    .action-btn {
+        padding: 12px;
+    }
+
+    .sidebar-toggle {
+        padding: 12px;
+    }
+
+    /* Make cards easier to tap */
+    .timetable-card,
+    .assessment-card {
+        padding: 16px;
+        margin-bottom: 4px;
+    }
+
+    /* Larger text on mobile */
+    .card-title {
+        font-size: 16px;
+    }
+
+    .card-time,
+    .card-location,
+    .card-course {
+        font-size: 14px;
+    }
+
+    /* Better spacing for top bar */
+    .top-bar {
+        padding: 16px;
+    }
+
+    /* Modal adjustments */
+    .modal {
+        padding: 8px;
+    }
+
+    .modal-content {
+        padding: 20px;
+        max-height: 85vh;
+    }
+
+    /* Form inputs larger for touch */
+    .form-input {
+        padding: 14px 12px;
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+
+    /* Color buttons easier to tap */
+    .color-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    /* Day headers */
+    .day-header h2 {
+        font-size: 18px;
+    }
+
+    /* Settings buttons stack on mobile */
+    .content-box button {
+        margin-left: 0 !important;
+        margin-top: 10px;
+        width: 100%;
+    }
+
+    .content-box button:first-of-type {
+        margin-top: 0;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Extra small devices - even more compact */
+    .sidebar {
+        width: 60px;
+    }
+
+    .main-content {
+        margin-left: 60px;
+    }
+
+    .sidebar-header {
+        padding: 16px 12px;
+    }
+
+    .top-bar {
+        padding: 12px;
+    }
+
+    .tab-content {
+        padding: 16px;
+    }
+
+    .timetable-grid,
+    .assessments-grid {
+        gap: 16px;
+    }
+
+    .day-column,
+    .assessment-column {
+        padding: 12px;
+    }
+
+    /* Smaller fonts for very small screens */
+    .day-header h2 {
+        font-size: 16px;
+    }
+
+    .card-title {
+        font-size: 15px;
     }
 }

@@ -51,6 +51,13 @@ body {
     transition: background-color 0.3s, color 0.3s;
     min-height: 100vh;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+    -moz-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-overflow-scrolling: touch;
 }
 
 #app {
@@ -58,7 +65,6 @@ body {
     min-height: 100vh;
 }
 
-/* Sidebar Styles */
 .sidebar {
     width: 250px;
     background-color: var(--sidebar-bg);
@@ -193,7 +199,6 @@ body.dark-mode .theme-toggle-sidebar {
     color: #fbbf24;
 }
 
-/* Main Content */
 .main-content {
     flex: 1;
     margin-left: 250px;
@@ -227,6 +232,11 @@ body.dark-mode .theme-toggle-sidebar {
     color: var(--text-primary);
     cursor: pointer;
     transition: all 0.2s;
+    min-width: 40px;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .action-btn:hover:not(:disabled) {
@@ -320,6 +330,10 @@ body.dark-mode .theme-toggle-sidebar {
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
     position: relative;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .timetable-card:hover,
@@ -373,7 +387,6 @@ body.dark-mode .theme-toggle-sidebar {
     margin-top: 4px;
 }
 
-/* Timetable Card Colors */
 .card-blue { background-color: var(--color-blue-light); }
 .card-yellow { background-color: var(--color-yellow-light); }
 .card-green { background-color: var(--color-green-light); }
@@ -390,7 +403,6 @@ body.dark-mode .card-red { background-color: var(--color-red-dark); }
 body.dark-mode .card-purple { background-color: var(--color-purple-dark); }
 body.dark-mode .card-pink { background-color: var(--color-pink-dark); }
 
-/* Assessment Card Colors based on urgency */
 .urgency-green { background-color: var(--color-green-light); }
 .urgency-yellow { background-color: var(--color-yellow-light); }
 .urgency-orange { background-color: var(--color-orange-light); }
@@ -400,6 +412,25 @@ body.dark-mode .urgency-green { background-color: var(--color-green-dark); }
 body.dark-mode .urgency-yellow { background-color: var(--color-yellow-dark); }
 body.dark-mode .urgency-orange { background-color: var(--color-orange-dark); }
 body.dark-mode .urgency-red { background-color: var(--color-red-dark); }
+
+@media (hover: none) and (pointer: coarse) {
+    .timetable-card:hover,
+    .assessment-card:hover {
+        transform: none;
+    }
+
+    .card-grip {
+        opacity: 0.3;
+    }
+
+    .nav-item {
+        padding: 16px 20px;
+    }
+
+    .close-btn {
+        padding: 8px;
+    }
+}
 
 .content-box {
     background-color: var(--bg-card);
@@ -438,7 +469,6 @@ body.dark-mode .urgency-red { background-color: var(--color-red-dark); }
     width: 100%;
 }
 
-/* Modal */
 .modal {
     position: fixed;
     inset: 0;
@@ -563,7 +593,6 @@ body.dark-mode .color-btn[data-color="red"] { background-color: var(--color-red-
 body.dark-mode .color-btn[data-color="purple"] { background-color: var(--color-purple-dark); }
 body.dark-mode .color-btn[data-color="pink"] { background-color: var(--color-pink-dark); }
 
-/* Changelog */
 .changelog-list {
     display: flex;
     flex-direction: column;
@@ -649,5 +678,111 @@ body.dark-mode .color-btn[data-color="pink"] { background-color: var(--color-pin
     .timetable-grid,
     .assessments-grid {
         grid-template-columns: 1fr;
+    }
+
+    .add-card-btn,
+    .add-assessment-btn {
+        padding: 8px;
+    }
+
+    .action-btn {
+        padding: 12px;
+    }
+
+    .sidebar-toggle {
+        padding: 12px;
+    }
+
+    .timetable-card,
+    .assessment-card {
+        padding: 16px;
+        margin-bottom: 4px;
+    }
+
+    .card-title {
+        font-size: 16px;
+    }
+
+    .card-time,
+    .card-location,
+    .card-course {
+        font-size: 14px;
+    }
+
+    .top-bar {
+        padding: 16px;
+    }
+
+    .modal {
+        padding: 8px;
+    }
+
+    .modal-content {
+        padding: 20px;
+        max-height: 85vh;
+    }
+
+    .form-input {
+        padding: 14px 12px;
+        font-size: 16px;
+    }
+
+    .color-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    .day-header h2 {
+        font-size: 18px;
+    }
+
+    .content-box button {
+        margin-left: 0 !important;
+        margin-top: 10px;
+        width: 100%;
+    }
+
+    .content-box button:first-of-type {
+        margin-top: 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .sidebar {
+        width: 60px;
+    }
+
+    .main-content {
+        margin-left: 60px;
+    }
+
+    .sidebar-header {
+        padding: 16px 12px;
+    }
+
+    .top-bar {
+        padding: 12px;
+    }
+
+    .tab-content {
+        padding: 16px;
+    }
+
+    .timetable-grid,
+    .assessments-grid {
+        gap: 16px;
+    }
+
+    .day-column,
+    .assessment-column {
+        padding: 12px;
+    }
+
+    .day-header h2 {
+        font-size: 16px;
+    }
+
+    .card-title {
+        font-size: 15px;
     }
 }

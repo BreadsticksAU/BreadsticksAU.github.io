@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>University Hub</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -13,7 +16,7 @@
             <div class="sidebar-header">
                 <h1 class="sidebar-title">
                     <span class="title-full">University Hub</span>
-                    <span class="title-short hidden">UH</span>
+                    <span class="title-short">UH</span>
                 </h1>
                 <button id="sidebarToggle" class="sidebar-toggle">
                     <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -222,8 +225,8 @@
                 <div class="content-box">
                     <h2>Settings</h2>
                     <button id="resetTimetable" class="btn-danger">Reset Timetable</button>
-                    <button id="clearChangelog" class="btn-danger" style="margin-left: 10px;">Clear Changelog</button>
-                    <button id="clearHistory" class="btn-danger" style="margin-left: 10px;">Clear Undo/Redo History</button>
+                    <button id="clearChangelog" class="btn-danger">Clear Changelog</button>
+                    <button id="clearHistory" class="btn-danger">Clear Undo/Redo History</button>
                 </div>
             </div>
 

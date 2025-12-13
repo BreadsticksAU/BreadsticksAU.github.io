@@ -28,6 +28,7 @@ const INITIAL_TIMETABLE = {
 // State management
 var timetable = {};
 var assessments = {};
+var importantMessages = [];
 var changelog = [];
 var darkMode = false;
 var sidebarCollapsed = false;
@@ -40,8 +41,13 @@ var historyIndex = -1;
 var MAX_HISTORY = 50;
 var draggedCard = null;
 var draggedFromDay = null;
+var dragGhost = null;
+var carouselInterval = null;
+var currentMessageIndex = 0;
+var userIdleTimeout = null;
+var lastActivityTime = Date.now();
 
-// Safe localStorage wrapper with error handling
+// Safe localStorage wrapper
 function safeLocalStorageSet(key, value) {
     try {
         localStorage.setItem(key, value);
@@ -49,13 +55,11 @@ function safeLocalStorageSet(key, value) {
     } catch (e) {
         console.error('LocalStorage error:', e);
         if (e.name === 'QuotaExceededError') {
-            // Storage full - clear old changelog entries
             changelog = changelog.slice(0, 20);
             try {
                 localStorage.setItem(key, value);
                 return true;
             } catch (e2) {
-                console.error('Still failed after cleanup:', e2);
                 return false;
             }
         }
@@ -80,7 +84,12 @@ document.addEventListener('DOMContentLoaded', function() {
     renderTimetable();
     renderAssessments();
     renderChangelog();
+    renderMessages();
+    updateMessageCarousel();
+    startCarousel();
     updateUndoRedoButtons();
+    dragGhost = document.getElementById('dragGhost');
+    setupActivityTracking();
     logEvent('Page loaded', 'Application started', new Date().toLocaleString());
 });
 
@@ -91,7 +100,6 @@ function loadState() {
         try {
             timetable = JSON.parse(saved);
         } catch (e) {
-            console.error('Corrupted timetable data, using default');
             timetable = JSON.parse(JSON.stringify(INITIAL_TIMETABLE));
         }
     } else {
@@ -103,11 +111,21 @@ function loadState() {
         try {
             assessments = JSON.parse(saved);
         } catch (e) {
-            console.error('Corrupted assessments data, using default');
             assessments = { todo: [], inprogress: [], extension: [], completed: [] };
         }
     } else {
         assessments = { todo: [], inprogress: [], extension: [], completed: [] };
+    }
+    
+    saved = safeLocalStorageGet('universityMessages');
+    if (saved) {
+        try {
+            importantMessages = JSON.parse(saved);
+        } catch (e) {
+            importantMessages = [];
+        }
+    } else {
+        importantMessages = [];
     }
     
     saved = safeLocalStorageGet('universityChangelog');
@@ -115,7 +133,6 @@ function loadState() {
         try {
             changelog = JSON.parse(saved);
         } catch (e) {
-            console.error('Corrupted changelog data, using default');
             changelog = [];
         }
     } else {
@@ -136,10 +153,11 @@ function loadState() {
     }
 }
 
-// Save state with error handling
+// Save state
 function saveState() {
     safeLocalStorageSet('universityTimetable', JSON.stringify(timetable));
     safeLocalStorageSet('universityAssessments', JSON.stringify(assessments));
+    safeLocalStorageSet('universityMessages', JSON.stringify(importantMessages));
     safeLocalStorageSet('universityChangelog', JSON.stringify(changelog));
     safeLocalStorageSet('universityDarkMode', darkMode);
     safeLocalStorageSet('sidebarCollapsed', sidebarCollapsed);
@@ -161,6 +179,8 @@ function checkWeeklyReset() {
         
         if (currentDay === 0 && daysSinceLastReset >= 7) {
             resetTimetable(true);
+            importantMessages = [];
+            saveState();
             safeLocalStorageSet('lastTimetableReset', now.getTime().toString());
         }
     } else {
@@ -220,26 +240,31 @@ function updateUndoRedoButtons() {
     document.getElementById('redoBtn').disabled = historyIndex >= undoHistory.length - 1;
 }
 
-// Time parsing
+// Improved time parsing for proper AM/PM sorting
 function parseTime(timeStr) {
+    // Extract just the start time from "HH:MM-HH:MM" format
     var startTime = timeStr.split('-')[0].trim();
-    var time, period;
     
-    if (startTime.includes('am') || startTime.includes('pm')) {
-        time = startTime.slice(0, -2);
-        period = startTime.slice(-2);
-    } else {
-        time = startTime;
-        period = '';
+    // Extract time and period separately
+    var timeMatch = startTime.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)/i);
+    
+    if (!timeMatch) {
+        // Fallback if format is unexpected
+        return 0;
     }
     
-    var timeParts = time.split(':');
-    var hours = parseInt(timeParts[0]);
-    var minutes = timeParts.length > 1 ? parseInt(timeParts[1]) : 0;
+    var hours = parseInt(timeMatch[1]);
+    var minutes = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
+    var period = timeMatch[3].toLowerCase();
     
-    if (period === 'pm' && hours !== 12) hours += 12;
-    if (period === 'am' && hours === 12) hours = 0;
+    // Convert to 24-hour format
+    if (period === 'pm' && hours !== 12) {
+        hours += 12;
+    } else if (period === 'am' && hours === 12) {
+        hours = 0;
+    }
     
+    // Return total minutes from midnight
     return hours * 60 + minutes;
 }
 
@@ -248,8 +273,11 @@ function sortCardsByTime(cards) {
         // Pinned cards always come first
         if (a.pinned && !b.pinned) return -1;
         if (!a.pinned && b.pinned) return 1;
+        
         // If both pinned or both unpinned, sort by time
-        return parseTime(a.time) - parseTime(b.time);
+        var timeA = parseTime(a.time);
+        var timeB = parseTime(b.time);
+        return timeA - timeB;
     });
 }
 
@@ -301,7 +329,6 @@ function logEvent(summary, details, timestamp) {
         details: details
     });
     
-    // Keep changelog at reasonable size
     if (changelog.length > 100) {
         changelog = changelog.slice(0, 100);
     }
@@ -309,12 +336,78 @@ function logEvent(summary, details, timestamp) {
     saveState();
 }
 
+// Carousel management
+function setupActivityTracking() {
+    var activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    
+    activityEvents.forEach(function(event) {
+        document.addEventListener(event, function() {
+            lastActivityTime = Date.now();
+        }, true);
+    });
+}
+
+function startCarousel() {
+    if (carouselInterval) {
+        clearInterval(carouselInterval);
+    }
+    
+    carouselInterval = setInterval(function() {
+        var timeSinceActivity = Date.now() - lastActivityTime;
+        
+        // Only rotate if user has been idle for 7 seconds
+        if (timeSinceActivity >= 7000 && importantMessages.length > 1) {
+            currentMessageIndex = (currentMessageIndex + 1) % importantMessages.length;
+            updateMessageCarousel();
+        }
+    }, 7000);
+}
+
+function updateMessageCarousel() {
+    var carousel = document.getElementById('importantMessagesCarousel');
+    var messageEl = document.getElementById('carouselMessage');
+    var dotsEl = document.getElementById('carouselDots');
+    
+    if (importantMessages.length === 0) {
+        carousel.classList.add('hidden');
+        return;
+    }
+    
+    carousel.classList.remove('hidden');
+    messageEl.textContent = importantMessages[currentMessageIndex];
+    
+    // Update dots
+    dotsEl.innerHTML = '';
+    if (importantMessages.length > 1) {
+        importantMessages.forEach(function(msg, index) {
+            var dot = document.createElement('div');
+            dot.className = 'carousel-dot' + (index === currentMessageIndex ? ' active' : '');
+            dot.addEventListener('click', function() {
+                currentMessageIndex = index;
+                updateMessageCarousel();
+                lastActivityTime = Date.now(); // Reset idle timer
+            });
+            dotsEl.appendChild(dot);
+        });
+    }
+}
+
 // Event listeners
 function setupEventListeners() {
+    // Sidebar toggle
     document.getElementById('sidebarToggle').addEventListener('click', function() {
         sidebarCollapsed = !sidebarCollapsed;
         document.getElementById('sidebar').classList.toggle('collapsed');
         saveState();
+    });
+    
+    // Click on grid pattern to expand sidebar
+    document.querySelector('.main-content').addEventListener('click', function(e) {
+        if (sidebarCollapsed && e.clientX <= 110) {
+            sidebarCollapsed = false;
+            document.getElementById('sidebar').classList.remove('collapsed');
+            saveState();
+        }
     });
     
     document.getElementById('themeToggle').addEventListener('click', function() {
@@ -339,6 +432,7 @@ function setupEventListeners() {
             item.classList.add('active');
             document.getElementById(tabName + 'Content').classList.add('active');
             if (tabName === 'changelog') renderChangelog();
+            if (tabName === 'messages') renderMessages();
         });
     });
     
@@ -356,6 +450,19 @@ function setupEventListeners() {
             e.stopPropagation();
             addNewAssessment(btn.dataset.status);
         });
+    });
+    
+    document.getElementById('addMessageBtn').addEventListener('click', function() {
+        var input = document.getElementById('newMessageInput');
+        var message = input.value.trim();
+        if (message) {
+            importantMessages.push(message);
+            input.value = '';
+            saveState();
+            renderMessages();
+            updateMessageCarousel();
+            logEvent('Message added', message, new Date().toLocaleString());
+        }
     });
     
     document.getElementById('closeModal').addEventListener('click', closeModal);
@@ -444,6 +551,17 @@ function setupEventListeners() {
             logEvent('History cleared', 'Undo/redo history cleared', new Date().toLocaleString());
         }
     });
+    
+    document.getElementById('clearMessages').addEventListener('click', function() {
+        if (confirm('Clear all important messages?')) {
+            importantMessages = [];
+            currentMessageIndex = 0;
+            saveState();
+            renderMessages();
+            updateMessageCarousel();
+            logEvent('Messages cleared', 'All important messages cleared', new Date().toLocaleString());
+        }
+    });
 }
 
 // Functions
@@ -500,6 +618,7 @@ function togglePin(cardId, day) {
 
 function updateEditingCard() {
     if (!editingCard || !editingDay) return;
+    saveToHistory();
     var cardIndex = timetable[editingDay].findIndex(function(c) { return c.id === editingCard.id; });
     timetable[editingDay][cardIndex].time = document.getElementById('editTime').value;
     timetable[editingDay][cardIndex].title = document.getElementById('editTitle').value;
@@ -512,6 +631,7 @@ function updateEditingCard() {
 
 function updateEditingAssessment() {
     if (!editingAssessment || !editingStatus) return;
+    saveToHistory();
     var idx = assessments[editingStatus].findIndex(function(a) { return a.id === editingAssessment.id; });
     assessments[editingStatus][idx].title = document.getElementById('editAssessmentTitle').value;
     assessments[editingStatus][idx].course = document.getElementById('editAssessmentCourse').value;
@@ -538,12 +658,16 @@ function openModal(card, day) {
 
 function closeModal() {
     if (editingCard && editingDay) {
-        saveToHistory();
         var idx = timetable[editingDay].findIndex(function(c) { return c.id === editingCard.id; });
-        var card = timetable[editingDay][idx];
-        logEvent('Card edited', card.title + ' edited in ' + editingDay + ' at ' + card.time, new Date().toLocaleString());
+        if (idx !== -1) {
+            var card = timetable[editingDay][idx];
+            logEvent('Card edited', card.title + ' edited in ' + editingDay + ' at ' + card.time, new Date().toLocaleString());
+        }
     }
-    document.getElementById('editModal').classList.add('hidden');
+    var modal = document.getElementById('editModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
     editingCard = null;
     editingDay = null;
 }
@@ -560,14 +684,55 @@ function openAssessmentModal(assessment, status) {
 
 function closeAssessmentModal() {
     if (editingAssessment && editingStatus) {
-        saveToHistory();
         var idx = assessments[editingStatus].findIndex(function(a) { return a.id === editingAssessment.id; });
-        var assessment = assessments[editingStatus][idx];
-        logEvent('Assessment edited', assessment.title + ' edited in ' + editingStatus + ' (Due: ' + new Date(assessment.dueDate).toLocaleString() + ')', new Date().toLocaleString());
+        if (idx !== -1) {
+            var assessment = assessments[editingStatus][idx];
+            logEvent('Assessment edited', assessment.title + ' edited in ' + editingStatus + ' (Due: ' + new Date(assessment.dueDate).toLocaleString() + ')', new Date().toLocaleString());
+        }
     }
-    document.getElementById('editAssessmentModal').classList.add('hidden');
+    var modal = document.getElementById('editAssessmentModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
     editingAssessment = null;
     editingStatus = null;
+}
+
+function renderMessages() {
+    var container = document.getElementById('messagesList');
+    container.innerHTML = '';
+    
+    if (importantMessages.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-secondary);">No important messages yet.</p>';
+        return;
+    }
+    
+    importantMessages.forEach(function(message, index) {
+        var messageEl = document.createElement('div');
+        messageEl.className = 'message-item';
+        
+        var textEl = document.createElement('div');
+        textEl.className = 'message-text';
+        textEl.textContent = message;
+        
+        var deleteBtn = document.createElement('button');
+        deleteBtn.className = 'message-delete';
+        deleteBtn.innerHTML = '<svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+        deleteBtn.addEventListener('click', function() {
+            importantMessages.splice(index, 1);
+            if (currentMessageIndex >= importantMessages.length && currentMessageIndex > 0) {
+                currentMessageIndex = importantMessages.length - 1;
+            }
+            saveState();
+            renderMessages();
+            updateMessageCarousel();
+            logEvent('Message deleted', message, new Date().toLocaleString());
+        });
+        
+        messageEl.appendChild(textEl);
+        messageEl.appendChild(deleteBtn);
+        container.appendChild(messageEl);
+    });
 }
 
 function renderTimetable() {
@@ -581,60 +746,27 @@ function renderTimetable() {
             container.appendChild(createCardElement(card, day));
         });
         
-        // Drag and drop handlers
         container.addEventListener('dragover', handleDragOver);
         container.addEventListener('drop', function(e) { handleDrop(e, day); });
-        container.addEventListener('dragleave', handleDragLeave);
     });
 }
 
 function handleDragOver(e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    
-    var container = e.currentTarget;
-    var afterElement = getDragAfterElement(container, e.clientY);
-    var dragging = document.querySelector('.dragging');
-    
-    // Remove existing drop indicators
-    var existingIndicators = container.querySelectorAll('.drop-indicator');
-    existingIndicators.forEach(function(ind) { ind.remove(); });
-    
-    if (afterElement == null) {
-        var indicator = createDropIndicator();
-        container.appendChild(indicator);
-    } else {
-        var indicator = createDropIndicator();
-        container.insertBefore(indicator, afterElement);
-    }
-}
-
-function handleDragLeave(e) {
-    if (e.target.classList.contains('cards-container')) {
-        var indicators = e.target.querySelectorAll('.drop-indicator');
-        indicators.forEach(function(ind) { ind.remove(); });
-    }
 }
 
 function handleDrop(e, day) {
     e.preventDefault();
     
-    // Remove drop indicators
-    var indicators = document.querySelectorAll('.drop-indicator');
-    indicators.forEach(function(ind) { ind.remove(); });
-    
     if (!draggedCard || !draggedFromDay) return;
     
-    // Prevent duplication - only proceed if actually moving
     if (draggedFromDay !== day) {
         saveToHistory();
-        
-        // Remove from source
         timetable[draggedFromDay] = timetable[draggedFromDay].filter(function(c) { 
             return c.id !== draggedCard.id; 
         });
         
-        // Add to destination
         timetable[day] = sortCardsByTime(timetable[day].concat([draggedCard]));
         
         saveState();
@@ -644,28 +776,6 @@ function handleDrop(e, day) {
     
     draggedCard = null;
     draggedFromDay = null;
-}
-
-function getDragAfterElement(container, y) {
-    var draggableElements = Array.from(container.querySelectorAll('.timetable-card:not(.dragging)'));
-    
-    return draggableElements.reduce(function(closest, child) {
-        var box = child.getBoundingClientRect();
-        var offset = y - box.top - box.height / 2;
-        
-        if (offset < 0 && offset > closest.offset) {
-            return { offset: offset, element: child };
-        } else {
-            return closest;
-        }
-    }, { offset: Number.NEGATIVE_INFINITY }).element;
-}
-
-function createDropIndicator() {
-    var indicator = document.createElement('div');
-    indicator.className = 'drop-indicator';
-    indicator.style.cssText = 'height: 4px; background: #3b82f6; border-radius: 2px; margin: 8px 0; transition: all 0.2s;';
-    return indicator;
 }
 
 function createCardElement(card, day) {
@@ -678,20 +788,33 @@ function createCardElement(card, day) {
         '<svg class="icon-small" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"/></svg>' :
         '<svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"/></svg>';
     
-    cardEl.innerHTML = '<div class="card-header-actions"><button class="pin-btn" onclick="event.stopPropagation(); togglePin(\'' + card.id + '\', \'' + day + '\')" title="' + (card.pinned ? 'Unpin' : 'Pin') + ' card">' + pinIcon + '</button><div class="card-grip"><svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg></div></div><div class="card-time">' + card.time + '</div><div class="card-title">' + card.title + '</div><div class="card-location">' + card.location + '</div>';
+    cardEl.innerHTML = '<div class="card-header-actions"><button class="pin-btn" onclick="event.stopPropagation(); togglePin(\'' + card.id + '\', \'' + day + '\')" title="' + (card.pinned ? 'Unpin' : 'Pin') + ' card">' + pinIcon + '</button></div><div class="card-time">' + card.time + '</div><div class="card-title">' + card.title + '</div><div class="card-location">' + card.location + '</div>';
     
     cardEl.addEventListener('dragstart', function(e) {
         cardEl.classList.add('dragging');
         draggedCard = card;
         draggedFromDay = day;
+        
+        var ghost = cardEl.cloneNode(true);
+        ghost.style.width = cardEl.offsetWidth + 'px';
+        ghost.classList.remove('dragging');
+        dragGhost.innerHTML = '';
+        dragGhost.appendChild(ghost);
+        dragGhost.classList.remove('hidden');
+        
         e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', card.id);
+        e.dataTransfer.setDragImage(dragGhost, 0, 0);
+    });
+    
+    cardEl.addEventListener('drag', function(e) {
+        if (e.clientX === 0 && e.clientY === 0) return;
+        dragGhost.style.left = e.clientX + 10 + 'px';
+        dragGhost.style.top = e.clientY + 10 + 'px';
     });
     
     cardEl.addEventListener('dragend', function() {
         cardEl.classList.remove('dragging');
-        var indicators = document.querySelectorAll('.drop-indicator');
-        indicators.forEach(function(ind) { ind.remove(); });
+        dragGhost.classList.add('hidden');
     });
     
     cardEl.addEventListener('click', function() {
@@ -739,7 +862,7 @@ function createAssessmentElement(assessment, status) {
     cardEl.className = 'assessment-card urgency-' + urgency;
     cardEl.draggable = true;
     var dueDate = new Date(assessment.dueDate).toLocaleDateString('en-AU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    cardEl.innerHTML = '<div class="card-grip"><svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg></div><div class="card-title">' + assessment.title + '</div><div class="card-course">' + assessment.course + '</div><div class="card-due">Due: ' + dueDate + '</div>';
+    cardEl.innerHTML = '<div class="card-title">' + assessment.title + '</div><div class="card-course">' + assessment.course + '</div><div class="card-due">Due: ' + dueDate + '</div>';
     cardEl.addEventListener('dragstart', function(e) {
         cardEl.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';

@@ -6,7 +6,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>University Hub</title>
+    <title>University Hub V5.0</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -47,6 +47,13 @@
                         <polyline points="10 9 9 9 8 9"></polyline>
                     </svg>
                     <span class="nav-text">Assessments</span>
+                </button>
+
+                <button class="nav-item" data-tab="messages">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span class="nav-text">Important Messages</span>
                 </button>
 
                 <button class="nav-item" data-tab="settings">
@@ -108,6 +115,21 @@
 
             <!-- Timetable Content -->
             <div id="timetableContent" class="tab-content active">
+                <!-- Important Messages Carousel -->
+                <div id="importantMessagesCarousel" class="important-messages-carousel hidden">
+                    <div class="carousel-content">
+                        <div class="carousel-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                <line x1="12" y1="9" x2="12" y2="13"></line>
+                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                            </svg>
+                        </div>
+                        <div class="carousel-message" id="carouselMessage">No important messages</div>
+                        <div class="carousel-dots" id="carouselDots"></div>
+                    </div>
+                </div>
+
                 <div class="timetable-grid">
                     <div class="day-column" data-day="Monday">
                         <div class="day-header">
@@ -220,13 +242,30 @@
                 </div>
             </div>
 
+            <!-- Important Messages Content -->
+            <div id="messagesContent" class="tab-content">
+                <div class="content-box">
+                    <h2>Important Messages</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px;">Messages will cycle on the timetable page every 7 seconds and persist until weekly reset.</p>
+                    <div class="form-group">
+                        <label>New Message</label>
+                        <textarea id="newMessageInput" class="form-input" rows="3" placeholder="Enter an important message..."></textarea>
+                    </div>
+                    <button id="addMessageBtn" class="btn-primary">Add Message</button>
+                    <div id="messagesList" class="messages-list"></div>
+                </div>
+            </div>
+
             <!-- Settings Content -->
             <div id="settingsContent" class="tab-content">
                 <div class="content-box">
                     <h2>Settings</h2>
-                    <button id="resetTimetable" class="btn-danger">Reset Timetable</button>
-                    <button id="clearChangelog" class="btn-danger">Clear Changelog</button>
-                    <button id="clearHistory" class="btn-danger">Clear Undo/Redo History</button>
+                    <div class="settings-actions">
+                        <button id="resetTimetable" class="btn-danger">Reset Timetable</button>
+                        <button id="clearChangelog" class="btn-danger">Clear Changelog</button>
+                        <button id="clearHistory" class="btn-danger">Clear Undo/Redo History</button>
+                        <button id="clearMessages" class="btn-danger">Clear All Messages</button>
+                    </div>
                 </div>
             </div>
 
@@ -319,6 +358,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Drag Ghost -->
+    <div id="dragGhost" class="drag-ghost hidden"></div>
 
     <script src="script.js"></script>
 </body>

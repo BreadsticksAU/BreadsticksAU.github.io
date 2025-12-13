@@ -97,6 +97,414 @@ document.addEventListener('DOMContentLoaded', function() {
     logEvent('Page loaded', 'Application started', new Date().toLocaleString());
 });
 
+// Event Listeners Setup
+function setupEventListeners() {
+    // Sidebar toggle
+    document.getElementById('sidebarToggle').addEventListener('click', function() {
+        sidebarCollapsed = !sidebarCollapsed;
+        document.getElementById('sidebar').classList.toggle('collapsed');
+        saveState();
+    });
+    
+    // Tab navigation
+    document.querySelectorAll('.nav-item').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var tab = btn.dataset.tab;
+            document.querySelectorAll('.nav-item').forEach(function(b) {
+                b.classList.remove('active');
+            });
+            btn.classList.add('active');
+            
+            document.querySelectorAll('.tab-content').forEach(function(content) {
+                content.classList.remove('active');
+            });
+            document.getElementById(tab + 'Content').classList.add('active');
+        });
+    });
+    
+    // Theme toggle in sidebar
+    document.getElementById('themeToggle').addEventListener('click', function() {
+        if (currentTheme === 'light') {
+            setTheme('dark');
+        } else if (currentTheme === 'dark') {
+            setTheme('vanta');
+        } else {
+            setTheme('light');
+        }
+    });
+    
+    // Theme options in themes tab
+    document.querySelectorAll('.theme-option').forEach(function(option) {
+        option.addEventListener('click', function() {
+            setTheme(option.dataset.theme);
+        });
+    });
+    
+    // Undo/Redo buttons
+    document.getElementById('undoBtn').addEventListener('click', undo);
+    document.getElementById('redoBtn').addEventListener('click', redo);
+    
+    // Add card buttons
+    document.querySelectorAll('.add-card-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var day = btn.dataset.day;
+            addCard(day);
+        });
+    });
+    
+    // Add assessment buttons
+    document.querySelectorAll('.add-assessment-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var status = btn.dataset.status;
+            addAssessment(status);
+        });
+    });
+    
+    // Modal close buttons
+    document.getElementById('closeModal').addEventListener('click', closeModal);
+    document.getElementById('closeAssessmentModal').addEventListener('click', closeAssessmentModal);
+    
+    // Click outside modal to close
+    document.getElementById('editModal').addEventListener('click', function(e) {
+        if (e.target === this) closeModal();
+    });
+    document.getElementById('editAssessmentModal').addEventListener('click', function(e) {
+        if (e.target === this) closeAssessmentModal();
+    });
+    
+    // Edit inputs
+    document.getElementById('editTime').addEventListener('input', updateEditingCard);
+    document.getElementById('editTitle').addEventListener('input', updateEditingCard);
+    document.getElementById('editLocation').addEventListener('input', updateEditingCard);
+    document.getElementById('editNotes').addEventListener('input', updateEditingCard);
+    
+    document.getElementById('editAssessmentTitle').addEventListener('input', updateEditingAssessment);
+    document.getElementById('editAssessmentCourse').addEventListener('input', updateEditingAssessment);
+    document.getElementById('editAssessmentDue').addEventListener('input', updateEditingAssessment);
+    document.getElementById('editAssessmentNotes').addEventListener('input', updateEditingAssessment);
+    
+    // Color picker buttons
+    document.querySelectorAll('.color-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            if (!editingCard || !editingDay) return;
+            var color = btn.dataset.color;
+            document.querySelectorAll('.color-btn').forEach(function(b) {
+                b.classList.remove('selected');
+            });
+            btn.classList.add('selected');
+            var idx = timetable[editingDay].findIndex(function(c) { return c.id === editingCard.id; });
+            timetable[editingDay][idx].color = color;
+            saveState();
+            renderTimetable();
+        });
+    });
+    
+    // Delete buttons
+    document.getElementById('deleteCard').addEventListener('click', function() {
+        if (!editingCard || !editingDay) return;
+        saveToHistory();
+        timetable[editingDay] = timetable[editingDay].filter(function(c) {
+            return c.id !== editingCard.id;
+        });
+        logEvent('Card deleted', editingCard.title + ' deleted from ' + editingDay, new Date().toLocaleString());
+        saveState();
+        renderTimetable();
+        closeModal();
+    });
+    
+    document.getElementById('deleteAssessment').addEventListener('click', function() {
+        if (!editingAssessment || !editingStatus) return;
+        saveToHistory();
+        assessments[editingStatus] = assessments[editingStatus].filter(function(a) {
+            return a.id !== editingAssessment.id;
+        });
+        logEvent('Assessment deleted', editingAssessment.title + ' deleted from ' + editingStatus, new Date().toLocaleString());
+        saveState();
+        renderAssessments();
+        closeAssessmentModal();
+    });
+    
+    // Important messages
+    document.getElementById('addMessageBtn').addEventListener('click', function() {
+        var input = document.getElementById('newMessageInput');
+        var message = input.value.trim();
+        if (message) {
+            saveToHistory();
+            importantMessages.push(message);
+            input.value = '';
+            saveState();
+            renderMessages();
+            updateMessageCarousel();
+            logEvent('Message added', message, new Date().toLocaleString());
+        }
+    });
+    
+    // Settings buttons
+    document.getElementById('resetTimetable').addEventListener('click', function() {
+        if (confirm('Are you sure you want to reset the timetable to default?')) {
+            resetTimetable();
+        }
+    });
+    
+    document.getElementById('clearChangelog').addEventListener('click', function() {
+        if (confirm('Are you sure you want to clear the changelog?')) {
+            changelog = [];
+            saveState();
+            renderChangelog();
+            logEvent('Changelog cleared', 'All changelog entries were deleted', new Date().toLocaleString());
+        }
+    });
+    
+    document.getElementById('clearHistory').addEventListener('click', function() {
+        if (confirm('Are you sure you want to clear undo/redo history?')) {
+            undoHistory = [];
+            historyIndex = -1;
+            updateUndoRedoButtons();
+            logEvent('History cleared', 'Undo/redo history was cleared', new Date().toLocaleString());
+        }
+    });
+    
+    document.getElementById('clearMessages').addEventListener('click', function() {
+        if (confirm('Are you sure you want to clear all important messages?')) {
+            saveToHistory();
+            importantMessages = [];
+            currentMessageIndex = 0;
+            saveState();
+            renderMessages();
+            updateMessageCarousel();
+            logEvent('Messages cleared', 'All important messages were deleted', new Date().toLocaleString());
+        }
+    });
+}
+
+// Add card function
+function addCard(day) {
+    saveToHistory();
+    var newCard = {
+        id: 'card_' + Date.now(),
+        time: '9:00am-10:00am',
+        title: 'New Card',
+        location: 'Location',
+        color: 'blue',
+        notes: '',
+        pinned: false
+    };
+    timetable[day].push(newCard);
+    timetable[day] = sortCardsByTime(timetable[day]);
+    saveState();
+    renderTimetable();
+    logEvent('Card added', 'New card added to ' + day, new Date().toLocaleString());
+}
+
+// Add assessment function
+function addAssessment(status) {
+    saveToHistory();
+    var tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    var dateStr = tomorrow.toISOString().slice(0, 16);
+    
+    var newAssessment = {
+        id: 'assessment_' + Date.now(),
+        title: 'New Assessment',
+        course: 'Course Code',
+        dueDate: dateStr,
+        notes: ''
+    };
+    assessments[status].push(newAssessment);
+    assessments[status] = sortAssessmentsByUrgency(assessments[status]);
+    saveState();
+    renderAssessments();
+    logEvent('Assessment added', 'New assessment added to ' + status, new Date().toLocaleString());
+}
+
+// Toggle pin function
+function togglePin(cardId, day) {
+    saveToHistory();
+    var idx = timetable[day].findIndex(function(c) { return c.id === cardId; });
+    if (idx !== -1) {
+        timetable[day][idx].pinned = !timetable[day][idx].pinned;
+        timetable[day] = sortCardsByTime(timetable[day]);
+        saveState();
+        renderTimetable();
+        var action = timetable[day][idx].pinned ? 'pinned' : 'unpinned';
+        logEvent('Card ' + action, timetable[day][idx].title + ' ' + action + ' in ' + day, new Date().toLocaleString());
+    }
+}
+
+// Duplicate card function
+function duplicateCard(cardId, day) {
+    saveToHistory();
+    var idx = timetable[day].findIndex(function(c) { return c.id === cardId; });
+    if (idx !== -1) {
+        var original = timetable[day][idx];
+        var duplicate = {
+            id: 'card_' + Date.now(),
+            time: original.time,
+            title: original.title + ' (Copy)',
+            location: original.location,
+            color: original.color,
+            notes: original.notes,
+            pinned: false
+        };
+        timetable[day].push(duplicate);
+        timetable[day] = sortCardsByTime(timetable[day]);
+        saveState();
+        renderTimetable();
+        logEvent('Card duplicated', original.title + ' duplicated in ' + day, new Date().toLocaleString());
+    }
+}
+
+// Duplicate assessment function
+function duplicateAssessment(assessmentId, status) {
+    saveToHistory();
+    var idx = assessments[status].findIndex(function(a) { return a.id === assessmentId; });
+    if (idx !== -1) {
+        var original = assessments[status][idx];
+        var duplicate = {
+            id: 'assessment_' + Date.now(),
+            title: original.title + ' (Copy)',
+            course: original.course,
+            dueDate: original.dueDate,
+            notes: original.notes
+        };
+        assessments[status].push(duplicate);
+        assessments[status] = sortAssessmentsByUrgency(assessments[status]);
+        saveState();
+        renderAssessments();
+        logEvent('Assessment duplicated', original.title + ' duplicated in ' + status, new Date().toLocaleString());
+    }
+}
+
+// Reset timetable function
+function resetTimetable(isAutoReset) {
+    saveToHistory();
+    timetable = JSON.parse(JSON.stringify(INITIAL_TIMETABLE));
+    saveState();
+    renderTimetable();
+    var resetType = isAutoReset ? 'Weekly auto-reset performed' : 'Manual reset to default';
+    logEvent('Timetable reset', resetType, new Date().toLocaleString());
+}
+
+function updateEditingCard() {
+    if (!editingCard || !editingDay) return;
+    var cardIndex = timetable[editingDay].findIndex(function(c) { return c.id === editingCard.id; });
+    timetable[editingDay][cardIndex].time = document.getElementById('editTime').value;
+    timetable[editingDay][cardIndex].title = document.getElementById('editTitle').value;
+    timetable[editingDay][cardIndex].location = document.getElementById('editLocation').value;
+    timetable[editingDay][cardIndex].notes = document.getElementById('editNotes').value;
+    timetable[editingDay] = sortCardsByTime(timetable[editingDay]);
+    saveState();
+    renderTimetable();
+}
+
+function updateEditingAssessment() {
+    if (!editingAssessment || !editingStatus) return;
+    var idx = assessments[editingStatus].findIndex(function(a) { return a.id === editingAssessment.id; });
+    assessments[editingStatus][idx].title = document.getElementById('editAssessmentTitle').value;
+    assessments[editingStatus][idx].course = document.getElementById('editAssessmentCourse').value;
+    assessments[editingStatus][idx].dueDate = document.getElementById('editAssessmentDue').value;
+    assessments[editingStatus][idx].notes = document.getElementById('editAssessmentNotes').value;
+    assessments[editingStatus] = sortAssessmentsByUrgency(assessments[editingStatus]);
+    saveState();
+    renderAssessments();
+}
+
+function openModal(card, day) {
+    editingCard = card;
+    editingDay = day;
+    document.getElementById('editTime').value = card.time;
+    document.getElementById('editTitle').value = card.title;
+    document.getElementById('editLocation').value = card.location;
+    document.getElementById('editNotes').value = card.notes;
+    var colorBtns = document.querySelectorAll('.color-btn');
+    colorBtns.forEach(function(btn) {
+        btn.classList.toggle('selected', btn.dataset.color === card.color);
+    });
+    document.getElementById('editModal').classList.remove('hidden');
+}
+
+function closeModal() {
+    if (editingCard && editingDay) {
+        saveToHistory();
+        var idx = timetable[editingDay].findIndex(function(c) { return c.id === editingCard.id; });
+        if (idx !== -1) {
+            var card = timetable[editingDay][idx];
+            logEvent('Card edited', card.title + ' edited in ' + editingDay + ' at ' + card.time, new Date().toLocaleString());
+        }
+    }
+    var modal = document.getElementById('editModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+    editingCard = null;
+    editingDay = null;
+}
+
+function openAssessmentModal(assessment, status) {
+    editingAssessment = assessment;
+    editingStatus = status;
+    document.getElementById('editAssessmentTitle').value = assessment.title;
+    document.getElementById('editAssessmentCourse').value = assessment.course;
+    document.getElementById('editAssessmentDue').value = assessment.dueDate;
+    document.getElementById('editAssessmentNotes').value = assessment.notes;
+    document.getElementById('editAssessmentModal').classList.remove('hidden');
+}
+
+function closeAssessmentModal() {
+    if (editingAssessment && editingStatus) {
+        saveToHistory();
+        var idx = assessments[editingStatus].findIndex(function(a) { return a.id === editingAssessment.id; });
+        if (idx !== -1) {
+            var assessment = assessments[editingStatus][idx];
+            logEvent('Assessment edited', assessment.title + ' edited in ' + editingStatus + ' (Due: ' + new Date(assessment.dueDate).toLocaleString() + ')', new Date().toLocaleString());
+        }
+    }
+    var modal = document.getElementById('editAssessmentModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+    editingAssessment = null;
+    editingStatus = null;
+}
+
+function renderMessages() {
+    var container = document.getElementById('messagesList');
+    container.innerHTML = '';
+    
+    if (importantMessages.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-secondary);">No important messages yet.</p>';
+        return;
+    }
+    
+    importantMessages.forEach(function(message, index) {
+        var messageEl = document.createElement('div');
+        messageEl.className = 'message-item';
+        
+        var textEl = document.createElement('div');
+        textEl.className = 'message-text';
+        textEl.textContent = message;
+        
+        var deleteBtn = document.createElement('button');
+        deleteBtn.className = 'message-delete';
+        deleteBtn.innerHTML = '<svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+        deleteBtn.addEventListener('click', function() {
+            saveToHistory();
+            importantMessages.splice(index, 1);
+            if (currentMessageIndex >= importantMessages.length && currentMessageIndex > 0) {
+                currentMessageIndex = importantMessages.length - 1;
+            }
+            saveState();
+            renderMessages();
+            updateMessageCarousel();
+            logEvent('Message deleted', message, new Date().toLocaleString());
+        });
+        
+        messageEl.appendChild(textEl);
+        messageEl.appendChild(deleteBtn);
+        container.appendChild(messageEl);
+    });
+}
+
 // Load state
 function loadState() {
     var saved = safeLocalStorageGet('universityTimetable');
@@ -470,127 +878,6 @@ function hideDropIndicator(container) {
     if (indicator) {
         indicator.classList.remove('active');
     }
-}
-
-// Initial timetable data - CONTINUED FROM PREVIOUS (Part 2)
-function updateEditingCard() {
-    if (!editingCard || !editingDay) return;
-    var cardIndex = timetable[editingDay].findIndex(function(c) { return c.id === editingCard.id; });
-    timetable[editingDay][cardIndex].time = document.getElementById('editTime').value;
-    timetable[editingDay][cardIndex].title = document.getElementById('editTitle').value;
-    timetable[editingDay][cardIndex].location = document.getElementById('editLocation').value;
-    timetable[editingDay][cardIndex].notes = document.getElementById('editNotes').value;
-    timetable[editingDay] = sortCardsByTime(timetable[editingDay]);
-    saveState();
-    renderTimetable();
-}
-
-function updateEditingAssessment() {
-    if (!editingAssessment || !editingStatus) return;
-    var idx = assessments[editingStatus].findIndex(function(a) { return a.id === editingAssessment.id; });
-    assessments[editingStatus][idx].title = document.getElementById('editAssessmentTitle').value;
-    assessments[editingStatus][idx].course = document.getElementById('editAssessmentCourse').value;
-    assessments[editingStatus][idx].dueDate = document.getElementById('editAssessmentDue').value;
-    assessments[editingStatus][idx].notes = document.getElementById('editAssessmentNotes').value;
-    assessments[editingStatus] = sortAssessmentsByUrgency(assessments[editingStatus]);
-    saveState();
-    renderAssessments();
-}
-
-function openModal(card, day) {
-    editingCard = card;
-    editingDay = day;
-    document.getElementById('editTime').value = card.time;
-    document.getElementById('editTitle').value = card.title;
-    document.getElementById('editLocation').value = card.location;
-    document.getElementById('editNotes').value = card.notes;
-    var colorBtns = document.querySelectorAll('.color-btn');
-    colorBtns.forEach(function(btn) {
-        btn.classList.toggle('selected', btn.dataset.color === card.color);
-    });
-    document.getElementById('editModal').classList.remove('hidden');
-}
-
-function closeModal() {
-    if (editingCard && editingDay) {
-        saveToHistory();
-        var idx = timetable[editingDay].findIndex(function(c) { return c.id === editingCard.id; });
-        if (idx !== -1) {
-            var card = timetable[editingDay][idx];
-            logEvent('Card edited', card.title + ' edited in ' + editingDay + ' at ' + card.time, new Date().toLocaleString());
-        }
-    }
-    var modal = document.getElementById('editModal');
-    if (modal) {
-        modal.classList.add('hidden');
-    }
-    editingCard = null;
-    editingDay = null;
-}
-
-function openAssessmentModal(assessment, status) {
-    editingAssessment = assessment;
-    editingStatus = status;
-    document.getElementById('editAssessmentTitle').value = assessment.title;
-    document.getElementById('editAssessmentCourse').value = assessment.course;
-    document.getElementById('editAssessmentDue').value = assessment.dueDate;
-    document.getElementById('editAssessmentNotes').value = assessment.notes;
-    document.getElementById('editAssessmentModal').classList.remove('hidden');
-}
-
-function closeAssessmentModal() {
-    if (editingAssessment && editingStatus) {
-        saveToHistory();
-        var idx = assessments[editingStatus].findIndex(function(a) { return a.id === editingAssessment.id; });
-        if (idx !== -1) {
-            var assessment = assessments[editingStatus][idx];
-            logEvent('Assessment edited', assessment.title + ' edited in ' + editingStatus + ' (Due: ' + new Date(assessment.dueDate).toLocaleString() + ')', new Date().toLocaleString());
-        }
-    }
-    var modal = document.getElementById('editAssessmentModal');
-    if (modal) {
-        modal.classList.add('hidden');
-    }
-    editingAssessment = null;
-    editingStatus = null;
-}
-
-function renderMessages() {
-    var container = document.getElementById('messagesList');
-    container.innerHTML = '';
-    
-    if (importantMessages.length === 0) {
-        container.innerHTML = '<p style="color: var(--text-secondary);">No important messages yet.</p>';
-        return;
-    }
-    
-    importantMessages.forEach(function(message, index) {
-        var messageEl = document.createElement('div');
-        messageEl.className = 'message-item';
-        
-        var textEl = document.createElement('div');
-        textEl.className = 'message-text';
-        textEl.textContent = message;
-        
-        var deleteBtn = document.createElement('button');
-        deleteBtn.className = 'message-delete';
-        deleteBtn.innerHTML = '<svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-        deleteBtn.addEventListener('click', function() {
-            saveToHistory();
-            importantMessages.splice(index, 1);
-            if (currentMessageIndex >= importantMessages.length && currentMessageIndex > 0) {
-                currentMessageIndex = importantMessages.length - 1;
-            }
-            saveState();
-            renderMessages();
-            updateMessageCarousel();
-            logEvent('Message deleted', message, new Date().toLocaleString());
-        });
-        
-        messageEl.appendChild(textEl);
-        messageEl.appendChild(deleteBtn);
-        container.appendChild(messageEl);
-    });
 }
 
 function renderTimetable() {

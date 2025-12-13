@@ -30,7 +30,7 @@ var timetable = {};
 var assessments = {};
 var importantMessages = [];
 var changelog = [];
-var darkMode = false;
+var currentTheme = 'light';
 var sidebarCollapsed = false;
 var editingCard = null;
 var editingDay = null;
@@ -41,11 +41,14 @@ var historyIndex = -1;
 var MAX_HISTORY = 50;
 var draggedCard = null;
 var draggedFromDay = null;
+var draggedAssessment = null;
+var draggedFromStatus = null;
 var dragGhost = null;
 var carouselInterval = null;
 var currentMessageIndex = 0;
 var userIdleTimeout = null;
 var lastActivityTime = Date.now();
+var currentDropIndicator = null;
 
 // Safe localStorage wrapper
 function safeLocalStorageSet(key, value) {
@@ -90,6 +93,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateUndoRedoButtons();
     dragGhost = document.getElementById('dragGhost');
     setupActivityTracking();
+    applyTheme();
     logEvent('Page loaded', 'Application started', new Date().toLocaleString());
 });
 
@@ -139,14 +143,8 @@ function loadState() {
         changelog = [];
     }
     
-    darkMode = safeLocalStorageGet('universityDarkMode') === 'true';
+    currentTheme = safeLocalStorageGet('universityTheme') || 'light';
     sidebarCollapsed = safeLocalStorageGet('sidebarCollapsed') === 'true';
-    
-    if (darkMode) {
-        document.body.classList.add('dark-mode');
-        document.getElementById('sunIcon').classList.add('hidden');
-        document.getElementById('moonIcon').classList.remove('hidden');
-    }
     
     if (sidebarCollapsed) {
         document.getElementById('sidebar').classList.add('collapsed');
@@ -159,8 +157,39 @@ function saveState() {
     safeLocalStorageSet('universityAssessments', JSON.stringify(assessments));
     safeLocalStorageSet('universityMessages', JSON.stringify(importantMessages));
     safeLocalStorageSet('universityChangelog', JSON.stringify(changelog));
-    safeLocalStorageSet('universityDarkMode', darkMode);
+    safeLocalStorageSet('universityTheme', currentTheme);
     safeLocalStorageSet('sidebarCollapsed', sidebarCollapsed);
+}
+
+// Theme management
+function applyTheme() {
+    var body = document.body;
+    body.classList.remove('dark-mode', 'vanta-black-mode');
+    
+    if (currentTheme === 'dark') {
+        body.classList.add('dark-mode');
+        document.getElementById('sunIcon').classList.add('hidden');
+        document.getElementById('moonIcon').classList.remove('hidden');
+    } else if (currentTheme === 'vanta') {
+        body.classList.add('vanta-black-mode');
+        document.getElementById('sunIcon').classList.add('hidden');
+        document.getElementById('moonIcon').classList.remove('hidden');
+    } else {
+        document.getElementById('sunIcon').classList.remove('hidden');
+        document.getElementById('moonIcon').classList.add('hidden');
+    }
+    
+    // Update theme selector
+    document.querySelectorAll('.theme-option').forEach(function(option) {
+        option.classList.toggle('active', option.dataset.theme === currentTheme);
+    });
+}
+
+function setTheme(theme) {
+    currentTheme = theme;
+    applyTheme();
+    saveState();
+    logEvent('Theme changed', 'Switched to ' + theme + ' mode', new Date().toLocaleString());
 }
 
 // Weekly reset check
@@ -192,7 +221,8 @@ function checkWeeklyReset() {
 function saveToHistory() {
     var state = {
         timetable: JSON.parse(JSON.stringify(timetable)),
-        assessments: JSON.parse(JSON.stringify(assessments))
+        assessments: JSON.parse(JSON.stringify(assessments)),
+        messages: JSON.parse(JSON.stringify(importantMessages))
     };
     
     undoHistory = undoHistory.slice(0, historyIndex + 1);
@@ -213,9 +243,12 @@ function undo() {
         var state = undoHistory[historyIndex];
         timetable = JSON.parse(JSON.stringify(state.timetable));
         assessments = JSON.parse(JSON.stringify(state.assessments));
+        importantMessages = JSON.parse(JSON.stringify(state.messages));
         saveState();
         renderTimetable();
         renderAssessments();
+        renderMessages();
+        updateMessageCarousel();
         updateUndoRedoButtons();
         logEvent('Undo action', 'Reverted to previous state', new Date().toLocaleString());
     }
@@ -227,9 +260,12 @@ function redo() {
         var state = undoHistory[historyIndex];
         timetable = JSON.parse(JSON.stringify(state.timetable));
         assessments = JSON.parse(JSON.stringify(state.assessments));
+        importantMessages = JSON.parse(JSON.stringify(state.messages));
         saveState();
         renderTimetable();
         renderAssessments();
+        renderMessages();
+        updateMessageCarousel();
         updateUndoRedoButtons();
         logEvent('Redo action', 'Restored next state', new Date().toLocaleString());
     }
@@ -242,14 +278,10 @@ function updateUndoRedoButtons() {
 
 // Improved time parsing for proper AM/PM sorting
 function parseTime(timeStr) {
-    // Extract just the start time from "HH:MM-HH:MM" format
     var startTime = timeStr.split('-')[0].trim();
-    
-    // Extract time and period separately
     var timeMatch = startTime.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)/i);
     
     if (!timeMatch) {
-        // Fallback if format is unexpected
         return 0;
     }
     
@@ -257,24 +289,20 @@ function parseTime(timeStr) {
     var minutes = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
     var period = timeMatch[3].toLowerCase();
     
-    // Convert to 24-hour format
     if (period === 'pm' && hours !== 12) {
         hours += 12;
     } else if (period === 'am' && hours === 12) {
         hours = 0;
     }
     
-    // Return total minutes from midnight
     return hours * 60 + minutes;
 }
 
 function sortCardsByTime(cards) {
     return cards.slice().sort(function(a, b) {
-        // Pinned cards always come first
         if (a.pinned && !b.pinned) return -1;
         if (!a.pinned && b.pinned) return 1;
         
-        // If both pinned or both unpinned, sort by time
         var timeA = parseTime(a.time);
         var timeB = parseTime(b.time);
         return timeA - timeB;
@@ -355,7 +383,6 @@ function startCarousel() {
     carouselInterval = setInterval(function() {
         var timeSinceActivity = Date.now() - lastActivityTime;
         
-        // Only rotate if user has been idle for 7 seconds
         if (timeSinceActivity >= 7000 && importantMessages.length > 1) {
             currentMessageIndex = (currentMessageIndex + 1) % importantMessages.length;
             updateMessageCarousel();
@@ -376,7 +403,6 @@ function updateMessageCarousel() {
     carousel.classList.remove('hidden');
     messageEl.textContent = importantMessages[currentMessageIndex];
     
-    // Update dots
     dotsEl.innerHTML = '';
     if (importantMessages.length > 1) {
         importantMessages.forEach(function(msg, index) {
@@ -385,240 +411,70 @@ function updateMessageCarousel() {
             dot.addEventListener('click', function() {
                 currentMessageIndex = index;
                 updateMessageCarousel();
-                lastActivityTime = Date.now(); // Reset idle timer
+                lastActivityTime = Date.now();
             });
             dotsEl.appendChild(dot);
         });
     }
 }
 
-// Event listeners
-function setupEventListeners() {
-    // Sidebar toggle
-    document.getElementById('sidebarToggle').addEventListener('click', function() {
-        sidebarCollapsed = !sidebarCollapsed;
-        document.getElementById('sidebar').classList.toggle('collapsed');
-        saveState();
+// Drop indicator management
+function showDropIndicator(container, y) {
+    var indicator = container.querySelector('.drop-indicator');
+    if (!indicator) return;
+    
+    var cards = Array.from(container.children).filter(function(el) {
+        return el.classList.contains('timetable-card') || el.classList.contains('assessment-card');
     });
     
-    // Click on grid pattern to expand sidebar
-    document.querySelector('.main-content').addEventListener('click', function(e) {
-        if (sidebarCollapsed && e.clientX <= 110) {
-            sidebarCollapsed = false;
-            document.getElementById('sidebar').classList.remove('collapsed');
-            saveState();
+    if (cards.length === 0) {
+        indicator.style.top = '0px';
+        indicator.classList.add('active');
+        return;
+    }
+    
+    var closestCard = null;
+    var closestDistance = Infinity;
+    var insertBefore = true;
+    
+    cards.forEach(function(card) {
+        var rect = card.getBoundingClientRect();
+        var cardMiddle = rect.top + rect.height / 2;
+        var distance = Math.abs(y - cardMiddle);
+        
+        if (distance < closestDistance) {
+            closestDistance = distance;
+            closestCard = card;
+            insertBefore = y < cardMiddle;
         }
     });
     
-    document.getElementById('themeToggle').addEventListener('click', function() {
-        darkMode = !darkMode;
-        document.body.classList.toggle('dark-mode');
-        document.getElementById('sunIcon').classList.toggle('hidden');
-        document.getElementById('moonIcon').classList.toggle('hidden');
-        saveState();
-        logEvent('Theme changed', 'Switched to ' + (darkMode ? 'dark' : 'light') + ' mode', new Date().toLocaleString());
-    });
-    
-    document.getElementById('undoBtn').addEventListener('click', undo);
-    document.getElementById('redoBtn').addEventListener('click', redo);
-    
-    var navItems = document.querySelectorAll('.nav-item');
-    navItems.forEach(function(item) {
-        item.addEventListener('click', function() {
-            var tabName = item.dataset.tab;
-            navItems.forEach(function(i) { i.classList.remove('active'); });
-            var allContent = document.querySelectorAll('.tab-content');
-            allContent.forEach(function(c) { c.classList.remove('active'); });
-            item.classList.add('active');
-            document.getElementById(tabName + 'Content').classList.add('active');
-            if (tabName === 'changelog') renderChangelog();
-            if (tabName === 'messages') renderMessages();
-        });
-    });
-    
-    var addBtns = document.querySelectorAll('.add-card-btn');
-    addBtns.forEach(function(btn) {
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            addNewCard(btn.dataset.day);
-        });
-    });
-    
-    var addAssessmentBtns = document.querySelectorAll('.add-assessment-btn');
-    addAssessmentBtns.forEach(function(btn) {
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            addNewAssessment(btn.dataset.status);
-        });
-    });
-    
-    document.getElementById('addMessageBtn').addEventListener('click', function() {
-        var input = document.getElementById('newMessageInput');
-        var message = input.value.trim();
-        if (message) {
-            importantMessages.push(message);
-            input.value = '';
-            saveState();
-            renderMessages();
-            updateMessageCarousel();
-            logEvent('Message added', message, new Date().toLocaleString());
+    if (closestCard) {
+        var rect = closestCard.getBoundingClientRect();
+        var containerRect = container.getBoundingClientRect();
+        var position;
+        
+        if (insertBefore) {
+            position = rect.top - containerRect.top - 2;
+        } else {
+            position = rect.bottom - containerRect.top + 10;
         }
-    });
-    
-    document.getElementById('closeModal').addEventListener('click', closeModal);
-    document.getElementById('editModal').addEventListener('click', function(e) {
-        if (e.target.id === 'editModal') closeModal();
-    });
-    
-    document.getElementById('closeAssessmentModal').addEventListener('click', closeAssessmentModal);
-    document.getElementById('editAssessmentModal').addEventListener('click', function(e) {
-        if (e.target.id === 'editAssessmentModal') closeAssessmentModal();
-    });
-    
-    document.getElementById('editTime').addEventListener('input', updateEditingCard);
-    document.getElementById('editTitle').addEventListener('input', updateEditingCard);
-    document.getElementById('editLocation').addEventListener('input', updateEditingCard);
-    document.getElementById('editNotes').addEventListener('input', updateEditingCard);
-    
-    document.getElementById('editAssessmentTitle').addEventListener('input', updateEditingAssessment);
-    document.getElementById('editAssessmentCourse').addEventListener('input', updateEditingAssessment);
-    document.getElementById('editAssessmentDue').addEventListener('input', updateEditingAssessment);
-    document.getElementById('editAssessmentNotes').addEventListener('input', updateEditingAssessment);
-    
-    var colorBtns = document.querySelectorAll('.color-btn');
-    colorBtns.forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            var color = btn.dataset.color;
-            colorBtns.forEach(function(b) { b.classList.remove('selected'); });
-            btn.classList.add('selected');
-            
-            if (editingCard && editingDay) {
-                saveToHistory();
-                var cardIndex = timetable[editingDay].findIndex(function(c) { return c.id === editingCard.id; });
-                timetable[editingDay][cardIndex].color = color;
-                saveState();
-                renderTimetable();
-                logEvent('Color changed', editingCard.title + ' color changed to ' + color + ' in ' + editingDay, new Date().toLocaleString());
-            }
-        });
-    });
-    
-    document.getElementById('deleteCard').addEventListener('click', function() {
-        if (editingCard && editingDay && confirm('Delete this card?')) {
-            saveToHistory();
-            var cardTitle = editingCard.title;
-            timetable[editingDay] = timetable[editingDay].filter(function(c) { return c.id !== editingCard.id; });
-            saveState();
-            renderTimetable();
-            closeModal();
-            logEvent('Card deleted', cardTitle + ' was deleted from ' + editingDay, new Date().toLocaleString());
-        }
-    });
-    
-    document.getElementById('deleteAssessment').addEventListener('click', function() {
-        if (editingAssessment && editingStatus && confirm('Delete this assessment?')) {
-            saveToHistory();
-            var title = editingAssessment.title;
-            assessments[editingStatus] = assessments[editingStatus].filter(function(a) { return a.id !== editingAssessment.id; });
-            saveState();
-            renderAssessments();
-            closeAssessmentModal();
-            logEvent('Assessment deleted', title + ' was deleted from ' + editingStatus, new Date().toLocaleString());
-        }
-    });
-    
-    document.getElementById('resetTimetable').addEventListener('click', function() {
-        if (confirm('Reset timetable to default?')) {
-            saveToHistory();
-            resetTimetable(false);
-        }
-    });
-    
-    document.getElementById('clearChangelog').addEventListener('click', function() {
-        if (confirm('Clear changelog?')) {
-            changelog = [];
-            saveState();
-            renderChangelog();
-            logEvent('Changelog cleared', 'All entries cleared', new Date().toLocaleString());
-        }
-    });
-    
-    document.getElementById('clearHistory').addEventListener('click', function() {
-        if (confirm('Clear undo/redo history?')) {
-            undoHistory = [];
-            historyIndex = -1;
-            updateUndoRedoButtons();
-            logEvent('History cleared', 'Undo/redo history cleared', new Date().toLocaleString());
-        }
-    });
-    
-    document.getElementById('clearMessages').addEventListener('click', function() {
-        if (confirm('Clear all important messages?')) {
-            importantMessages = [];
-            currentMessageIndex = 0;
-            saveState();
-            renderMessages();
-            updateMessageCarousel();
-            logEvent('Messages cleared', 'All important messages cleared', new Date().toLocaleString());
-        }
-    });
+        
+        indicator.style.top = position + 'px';
+        indicator.classList.add('active');
+    }
 }
 
-// Functions
-function resetTimetable(isAutomatic) {
-    timetable = JSON.parse(JSON.stringify(INITIAL_TIMETABLE));
-    saveState();
-    renderTimetable();
-    logEvent('Timetable reset', isAutomatic ? 'Automatic weekly reset (Sunday 12am AEST)' : 'Manual reset', new Date().toLocaleString());
+function hideDropIndicator(container) {
+    var indicator = container.querySelector('.drop-indicator');
+    if (indicator) {
+        indicator.classList.remove('active');
+    }
 }
 
-function addNewCard(day) {
-    saveToHistory();
-    var newCard = {
-        id: day.toLowerCase() + '-' + Date.now(),
-        time: '9:00-10:00am',
-        title: 'New Event',
-        location: 'Location',
-        color: 'blue',
-        notes: '',
-        pinned: false
-    };
-    timetable[day] = sortCardsByTime(timetable[day].concat([newCard]));
-    saveState();
-    renderTimetable();
-    logEvent('Card added', 'New Event added to ' + day, new Date().toLocaleString());
-}
-
-function addNewAssessment(status) {
-    saveToHistory();
-    var newAssessment = {
-        id: status + '-' + Date.now(),
-        title: 'New Assessment',
-        course: 'Course Code',
-        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
-        notes: ''
-    };
-    assessments[status].push(newAssessment);
-    assessments[status] = sortAssessmentsByUrgency(assessments[status]);
-    saveState();
-    renderAssessments();
-    logEvent('Assessment added', 'New Assessment added to ' + status, new Date().toLocaleString());
-}
-
-function togglePin(cardId, day) {
-    saveToHistory();
-    var cardIndex = timetable[day].findIndex(function(c) { return c.id === cardId; });
-    var card = timetable[day][cardIndex];
-    card.pinned = !card.pinned;
-    timetable[day] = sortCardsByTime(timetable[day]);
-    saveState();
-    renderTimetable();
-    logEvent('Card ' + (card.pinned ? 'pinned' : 'unpinned'), card.title + ' in ' + day, new Date().toLocaleString());
-}
-
+// Initial timetable data - CONTINUED FROM PREVIOUS (Part 2)
 function updateEditingCard() {
     if (!editingCard || !editingDay) return;
-    saveToHistory();
     var cardIndex = timetable[editingDay].findIndex(function(c) { return c.id === editingCard.id; });
     timetable[editingDay][cardIndex].time = document.getElementById('editTime').value;
     timetable[editingDay][cardIndex].title = document.getElementById('editTitle').value;
@@ -631,7 +487,6 @@ function updateEditingCard() {
 
 function updateEditingAssessment() {
     if (!editingAssessment || !editingStatus) return;
-    saveToHistory();
     var idx = assessments[editingStatus].findIndex(function(a) { return a.id === editingAssessment.id; });
     assessments[editingStatus][idx].title = document.getElementById('editAssessmentTitle').value;
     assessments[editingStatus][idx].course = document.getElementById('editAssessmentCourse').value;
@@ -658,6 +513,7 @@ function openModal(card, day) {
 
 function closeModal() {
     if (editingCard && editingDay) {
+        saveToHistory();
         var idx = timetable[editingDay].findIndex(function(c) { return c.id === editingCard.id; });
         if (idx !== -1) {
             var card = timetable[editingDay][idx];
@@ -684,6 +540,7 @@ function openAssessmentModal(assessment, status) {
 
 function closeAssessmentModal() {
     if (editingAssessment && editingStatus) {
+        saveToHistory();
         var idx = assessments[editingStatus].findIndex(function(a) { return a.id === editingAssessment.id; });
         if (idx !== -1) {
             var assessment = assessments[editingStatus][idx];
@@ -719,6 +576,7 @@ function renderMessages() {
         deleteBtn.className = 'message-delete';
         deleteBtn.innerHTML = '<svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
         deleteBtn.addEventListener('click', function() {
+            saveToHistory();
             importantMessages.splice(index, 1);
             if (currentMessageIndex >= importantMessages.length && currentMessageIndex > 0) {
                 currentMessageIndex = importantMessages.length - 1;
@@ -739,26 +597,45 @@ function renderTimetable() {
     var days = ['Monday', 'Tuesday', 'Thursday', 'Friday'];
     days.forEach(function(day) {
         var container = document.getElementById(day.toLowerCase() + '-cards');
-        container.innerHTML = '';
-        
-        var sortedCards = sortCardsByTime(timetable[day]);
-        sortedCards.forEach(function(card) {
-            container.appendChild(createCardElement(card, day));
+        var cards = Array.from(container.children).filter(function(el) {
+            return el.classList.contains('timetable-card');
+        });
+        cards.forEach(function(card) {
+            card.remove();
         });
         
-        container.addEventListener('dragover', handleDragOver);
-        container.addEventListener('drop', function(e) { handleDrop(e, day); });
+        var sortedCards = sortCardsByTime(timetable[day]);
+        var indicator = container.querySelector('.drop-indicator');
+        sortedCards.forEach(function(card) {
+            var cardEl = createCardElement(card, day);
+            if (indicator) {
+                container.insertBefore(cardEl, indicator);
+            } else {
+                container.appendChild(cardEl);
+            }
+        });
+        
+        container.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            showDropIndicator(container, e.clientY);
+        });
+        
+        container.addEventListener('dragleave', function(e) {
+            if (e.target === container || e.target.classList.contains('drop-indicator')) {
+                hideDropIndicator(container);
+            }
+        });
+        
+        container.addEventListener('drop', function(e) {
+            e.preventDefault();
+            hideDropIndicator(container);
+            handleDrop(e, day);
+        });
     });
 }
 
-function handleDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-}
-
 function handleDrop(e, day) {
-    e.preventDefault();
-    
     if (!draggedCard || !draggedFromDay) return;
     
     if (draggedFromDay !== day) {
@@ -788,7 +665,7 @@ function createCardElement(card, day) {
         '<svg class="icon-small" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"/></svg>' :
         '<svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"/></svg>';
     
-    cardEl.innerHTML = '<div class="card-header-actions"><button class="pin-btn" onclick="event.stopPropagation(); togglePin(\'' + card.id + '\', \'' + day + '\')" title="' + (card.pinned ? 'Unpin' : 'Pin') + ' card">' + pinIcon + '</button></div><div class="card-time">' + card.time + '</div><div class="card-title">' + card.title + '</div><div class="card-location">' + card.location + '</div>';
+    cardEl.innerHTML = '<div class="card-header-actions"><button class="duplicate-btn" onclick="event.stopPropagation(); duplicateCard(\'' + card.id + '\', \'' + day + '\')" title="Duplicate card"><svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button><button class="pin-btn" onclick="event.stopPropagation(); togglePin(\'' + card.id + '\', \'' + day + '\')" title="' + (card.pinned ? 'Unpin' : 'Pin') + ' card">' + pinIcon + '</button></div><div class="card-time">' + card.time + '</div><div class="card-title">' + card.title + '</div><div class="card-location">' + card.location + '</div>';
     
     cardEl.addEventListener('dragstart', function(e) {
         cardEl.classList.add('dragging');
@@ -815,6 +692,10 @@ function createCardElement(card, day) {
     cardEl.addEventListener('dragend', function() {
         cardEl.classList.remove('dragging');
         dragGhost.classList.add('hidden');
+        var allContainers = document.querySelectorAll('.cards-container');
+        allContainers.forEach(function(container) {
+            hideDropIndicator(container);
+        });
     });
     
     cardEl.addEventListener('click', function() {
@@ -828,30 +709,55 @@ function renderAssessments() {
     var statuses = ['todo', 'inprogress', 'extension', 'completed'];
     statuses.forEach(function(status) {
         var container = document.getElementById(status + '-assessments');
-        container.innerHTML = '';
-        var sorted = sortAssessmentsByUrgency(assessments[status]);
-        sorted.forEach(function(assessment) {
-            container.appendChild(createAssessmentElement(assessment, status));
+        var cards = Array.from(container.children).filter(function(el) {
+            return el.classList.contains('assessment-card');
         });
+        cards.forEach(function(card) {
+            card.remove();
+        });
+        
+        var sorted = sortAssessmentsByUrgency(assessments[status]);
+        var indicator = container.querySelector('.drop-indicator');
+        sorted.forEach(function(assessment) {
+            var cardEl = createAssessmentElement(assessment, status);
+            if (indicator) {
+                container.insertBefore(cardEl, indicator);
+            } else {
+                container.appendChild(cardEl);
+            }
+        });
+        
         container.addEventListener('dragover', function(e) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
+            showDropIndicator(container, e.clientY);
         });
+        
+        container.addEventListener('dragleave', function(e) {
+            if (e.target === container || e.target.classList.contains('drop-indicator')) {
+                hideDropIndicator(container);
+            }
+        });
+        
         container.addEventListener('drop', function(e) {
             e.preventDefault();
-            var data = e.dataTransfer.getData('application/json');
-            if (!data) return;
-            var parsed = JSON.parse(data);
-            var assessment = parsed.assessment;
-            var fromStatus = parsed.fromStatus;
-            if (fromStatus !== status) {
+            hideDropIndicator(container);
+            
+            if (!draggedAssessment || !draggedFromStatus) return;
+            
+            if (draggedFromStatus !== status) {
                 saveToHistory();
-                assessments[fromStatus] = assessments[fromStatus].filter(function(a) { return a.id !== assessment.id; });
-                assessments[status] = sortAssessmentsByUrgency(assessments[status].concat([assessment]));
+                assessments[draggedFromStatus] = assessments[draggedFromStatus].filter(function(a) { 
+                    return a.id !== draggedAssessment.id; 
+                });
+                assessments[status] = sortAssessmentsByUrgency(assessments[status].concat([draggedAssessment]));
                 saveState();
                 renderAssessments();
-                logEvent('Assessment moved', assessment.title + ' moved from ' + fromStatus + ' to ' + status, new Date().toLocaleString());
+                logEvent('Assessment moved', draggedAssessment.title + ' moved from ' + draggedFromStatus + ' to ' + status, new Date().toLocaleString());
             }
+            
+            draggedAssessment = null;
+            draggedFromStatus = null;
         });
     });
 }
@@ -862,18 +768,44 @@ function createAssessmentElement(assessment, status) {
     cardEl.className = 'assessment-card urgency-' + urgency;
     cardEl.draggable = true;
     var dueDate = new Date(assessment.dueDate).toLocaleDateString('en-AU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    cardEl.innerHTML = '<div class="card-title">' + assessment.title + '</div><div class="card-course">' + assessment.course + '</div><div class="card-due">Due: ' + dueDate + '</div>';
+    
+    cardEl.innerHTML = '<div class="card-header-actions"><button class="duplicate-btn" onclick="event.stopPropagation(); duplicateAssessment(\'' + assessment.id + '\', \'' + status + '\')" title="Duplicate assessment"><svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div><div class="card-title">' + assessment.title + '</div><div class="card-course">' + assessment.course + '</div><div class="card-due">Due: ' + dueDate + '</div>';
+    
     cardEl.addEventListener('dragstart', function(e) {
         cardEl.classList.add('dragging');
+        draggedAssessment = assessment;
+        draggedFromStatus = status;
+        
+        var ghost = cardEl.cloneNode(true);
+        ghost.style.width = cardEl.offsetWidth + 'px';
+        ghost.classList.remove('dragging');
+        dragGhost.innerHTML = '';
+        dragGhost.appendChild(ghost);
+        dragGhost.classList.remove('hidden');
+        
         e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('application/json', JSON.stringify({ assessment: assessment, fromStatus: status }));
+        e.dataTransfer.setDragImage(dragGhost, 0, 0);
     });
+    
+    cardEl.addEventListener('drag', function(e) {
+        if (e.clientX === 0 && e.clientY === 0) return;
+        dragGhost.style.left = e.clientX + 10 + 'px';
+        dragGhost.style.top = e.clientY + 10 + 'px';
+    });
+    
     cardEl.addEventListener('dragend', function() {
         cardEl.classList.remove('dragging');
+        dragGhost.classList.add('hidden');
+        var allContainers = document.querySelectorAll('.cards-container');
+        allContainers.forEach(function(container) {
+            hideDropIndicator(container);
+        });
     });
+    
     cardEl.addEventListener('click', function() {
         openAssessmentModal(assessment, status);
     });
+    
     return cardEl;
 }
 

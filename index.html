@@ -6,7 +6,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>University Hub V5.0</title>
+    <title>University Hub V5.1</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -18,7 +18,7 @@
                     <span class="title-full">University Hub</span>
                     <span class="title-short">UH</span>
                 </h1>
-                <button id="sidebarToggle" class="sidebar-toggle">
+                <button id="sidebarToggle" class="sidebar-toggle" title="Toggle sidebar">
                     <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="3" y1="12" x2="21" y2="12"></line>
                         <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -56,10 +56,21 @@
                     <span class="nav-text">Important Messages</span>
                 </button>
 
+                <button class="nav-item" data-tab="themes">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M12 2v20"></path>
+                        <path d="M12 2a10 10 0 0 0 0 20"></path>
+                    </svg>
+                    <span class="nav-text">Themes</span>
+                </button>
+
                 <button class="nav-item" data-tab="settings">
                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="3"></circle>
-                        <path d="M12 1v6m0 6v6m8.66-11a9 9 0 01-17.32 0m17.32 6a9 9 0 01-17.32 0"></path>
+                        <path d="M12 1v6m0 6v6"></path>
+                        <path d="M6.34 6.34l4.24 4.24m4.24 4.24l4.24 4.24"></path>
+                        <path d="M6.34 17.66l4.24-4.24m4.24-4.24l4.24-4.24"></path>
                     </svg>
                     <span class="nav-text">Settings</span>
                 </button>
@@ -119,7 +130,7 @@
                 <div id="importantMessagesCarousel" class="important-messages-carousel hidden">
                     <div class="carousel-content">
                         <div class="carousel-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
                                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
                                 <line x1="12" y1="9" x2="12" y2="13"></line>
                                 <line x1="12" y1="17" x2="12.01" y2="17"></line>
@@ -141,7 +152,9 @@
                                 </svg>
                             </button>
                         </div>
-                        <div class="cards-container" id="monday-cards"></div>
+                        <div class="cards-container" id="monday-cards">
+                            <div class="drop-indicator"></div>
+                        </div>
                     </div>
 
                     <div class="day-column" data-day="Tuesday">
@@ -154,7 +167,9 @@
                                 </svg>
                             </button>
                         </div>
-                        <div class="cards-container" id="tuesday-cards"></div>
+                        <div class="cards-container" id="tuesday-cards">
+                            <div class="drop-indicator"></div>
+                        </div>
                     </div>
 
                     <div class="day-column" data-day="Thursday">
@@ -167,7 +182,9 @@
                                 </svg>
                             </button>
                         </div>
-                        <div class="cards-container" id="thursday-cards"></div>
+                        <div class="cards-container" id="thursday-cards">
+                            <div class="drop-indicator"></div>
+                        </div>
                     </div>
 
                     <div class="day-column" data-day="Friday">
@@ -180,7 +197,9 @@
                                 </svg>
                             </button>
                         </div>
-                        <div class="cards-container" id="friday-cards"></div>
+                        <div class="cards-container" id="friday-cards">
+                            <div class="drop-indicator"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -198,7 +217,9 @@
                                 </svg>
                             </button>
                         </div>
-                        <div class="cards-container" id="todo-assessments"></div>
+                        <div class="cards-container" id="todo-assessments">
+                            <div class="drop-indicator"></div>
+                        </div>
                     </div>
 
                     <div class="assessment-column" data-status="inprogress">
@@ -211,7 +232,9 @@
                                 </svg>
                             </button>
                         </div>
-                        <div class="cards-container" id="inprogress-assessments"></div>
+                        <div class="cards-container" id="inprogress-assessments">
+                            <div class="drop-indicator"></div>
+                        </div>
                     </div>
 
                     <div class="assessment-column" data-status="extension">
@@ -224,7 +247,9 @@
                                 </svg>
                             </button>
                         </div>
-                        <div class="cards-container" id="extension-assessments"></div>
+                        <div class="cards-container" id="extension-assessments">
+                            <div class="drop-indicator"></div>
+                        </div>
                     </div>
 
                     <div class="assessment-column" data-status="completed">
@@ -237,7 +262,9 @@
                                 </svg>
                             </button>
                         </div>
-                        <div class="cards-container" id="completed-assessments"></div>
+                        <div class="cards-container" id="completed-assessments">
+                            <div class="drop-indicator"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -253,6 +280,36 @@
                     </div>
                     <button id="addMessageBtn" class="btn-primary">Add Message</button>
                     <div id="messagesList" class="messages-list"></div>
+                </div>
+            </div>
+
+            <!-- Themes Content -->
+            <div id="themesContent" class="tab-content">
+                <div class="content-box">
+                    <h2>Themes</h2>
+                    <div class="theme-selector">
+                        <div class="theme-option active" data-theme="light">
+                            <div class="theme-preview light"></div>
+                            <div>
+                                <div style="font-weight: 600;">Light Mode</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Bright and clean</div>
+                            </div>
+                        </div>
+                        <div class="theme-option" data-theme="dark">
+                            <div class="theme-preview dark"></div>
+                            <div>
+                                <div style="font-weight: 600;">Dark Mode</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Easy on the eyes</div>
+                            </div>
+                        </div>
+                        <div class="theme-option" data-theme="vanta">
+                            <div class="theme-preview vanta"></div>
+                            <div>
+                                <div style="font-weight: 600;">Vanta Black</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Pure darkness</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

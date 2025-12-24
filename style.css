@@ -673,6 +673,24 @@ body.dark-mode .card-slate { background: linear-gradient(135deg, #334155 0%, #47
 body.dark-mode .card-sunset { background: linear-gradient(135deg, #b44b2b 0%, #ff7a59 100%); }
 body.dark-mode .card-ocean { background: linear-gradient(135deg, #0f766e 0%, #0369a1 100%); }
 
+/* Vanta-black (pitch black) variants: even darker / more muted */
+body.vanta-black-mode .card-blue { background: linear-gradient(135deg, #153a66 0%, #2b4f8f 100%); }
+body.vanta-black-mode .card-green { background: linear-gradient(135deg, #154f32 0%, #1f6f3f 100%); }
+body.vanta-black-mode .card-yellow { background: linear-gradient(135deg, #783f05 0%, #a16207 100%); }
+body.vanta-black-mode .card-orange { background: linear-gradient(135deg, #7a2f10 0%, #b44f23 100%); }
+body.vanta-black-mode .card-red { background: linear-gradient(135deg, #5b1414 0%, #8b1f1f 100%); }
+body.vanta-black-mode .card-purple { background: linear-gradient(135deg, #2a0f5a 0%, #4b2e9b 100%); }
+body.vanta-black-mode .card-pink { background: linear-gradient(135deg, #6f1141 0%, #9e2b6f 100%); }
+
+body.vanta-black-mode .card-teal { background: linear-gradient(135deg, #043f37 0%, #0c6b61 100%); }
+body.vanta-black-mode .card-cyan { background: linear-gradient(135deg, #044a56 0%, #0b6474 100%); }
+body.vanta-black-mode .card-indigo { background: linear-gradient(135deg, #1f2a78 0%, #3a3f9f 100%); }
+body.vanta-black-mode .card-lime { background: linear-gradient(135deg, #3a5b08 0%, #6b8e0a 100%); }
+body.vanta-black-mode .card-amber { background: linear-gradient(135deg, #6f3a03 0%, #9a5b0a 100%); }
+body.vanta-black-mode .card-slate { background: linear-gradient(135deg, #0b1220 0%, #273041 100%); color: #e6e6e6; }
+body.vanta-black-mode .card-sunset { background: linear-gradient(135deg, #6f2b14 0%, #9b4d2c 100%); }
+body.vanta-black-mode .card-ocean { background: linear-gradient(135deg, #043d3b 0%, #0a5560 100%); }
+
 /* flash review styles */
 .flash-review {
     margin-top: 20px;
@@ -735,7 +753,7 @@ body.dark-mode .card-ocean { background: linear-gradient(135deg, #0f766e 0%, #03
     display: none;
 }
 
-/* overlay while waiting to reveal */
+/* overlay while waiting to reveal (light theme style) */
 .flash-card .reveal-overlay {
     position: absolute;
     inset: 0;
@@ -784,6 +802,37 @@ body.dark-mode .card-ocean { background: linear-gradient(135deg, #0f766e 0%, #03
 
 .modal:not(.hidden) .flash-modal-content {
     transform: translateY(0);
+}
+
+/* Dark theme: make flashcards dark and text white */
+body.dark-mode .flash-card,
+body.vanta-black-mode .flash-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.01) 100%);
+    border: 1px solid rgba(255,255,255,0.04);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+    color: #ffffff;
+}
+
+body.dark-mode .flash-card .course,
+body.vanta-black-mode .flash-card .course {
+    color: #cbd5e1; /* muted light */
+}
+
+body.dark-mode .flash-card .question,
+body.vanta-black-mode .flash-card .question {
+    color: #ffffff;
+}
+
+body.dark-mode .flash-card .answer,
+body.vanta-black-mode .flash-card .answer {
+    color: #e6e6e6;
+}
+
+/* overlay style for dark themes */
+body.dark-mode .flash-card .reveal-overlay,
+body.vanta-black-mode .flash-card .reveal-overlay {
+    background: rgba(0,0,0,0.6);
+    color: #ffffff;
 }
 
 /* content-box and other styles reused below */

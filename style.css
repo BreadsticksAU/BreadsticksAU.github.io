@@ -435,23 +435,26 @@ body.dark-mode .theme-toggle-sidebar {
     position: relative;
 }
 
+/* Drop placeholder: now a card-like element inserted in place where the dragged item will land */
 .drop-indicator {
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: #3b82f6;
-    border-radius: 2px;
-    transition: top 0.15s ease;
-    pointer-events: none;
-    opacity: 0;
-    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+    display: none;
+    border-radius: 10px;
+    min-height: 58px;
+    padding: 12px;
+    margin: 0;
+    background: linear-gradient(135deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02));
+    border: 1px dashed rgba(59,130,246,0.5);
+    box-shadow: 0 10px 30px rgba(59,130,246,0.12), inset 0 1px 0 rgba(255,255,255,0.3);
 }
 
+/* Visible state */
 .drop-indicator.active {
-    opacity: 1;
+    display: block;
+    transition: all 0.12s ease;
+    transform: translateY(0);
 }
 
+/* Original card styling */
 .timetable-card,
 .assessment-card {
     padding: 14px;

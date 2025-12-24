@@ -486,6 +486,7 @@ function renderMessages() {
         
         var deleteBtn = document.createElement('button');
         deleteBtn.className = 'message-delete';
+        deleteBtn.title = 'Delete';
         deleteBtn.innerHTML = '<svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
         deleteBtn.addEventListener('click', function() {
             saveToHistory();
@@ -686,16 +687,34 @@ function updateUndoRedoButtons() {
 
 // Improved time parsing for proper AM/PM sorting
 function parseTime(timeStr) {
-    var startTime = timeStr.split('-')[0].trim();
-    var timeMatch = startTime.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)/i);
+    // Accept ranges like "6:15-7:45am", "1:45-3:15pm", "10:00am-12:00pm", or single times.
+    // If start part lacks am/pm, inherit am/pm from end part when possible.
+    var parts = timeStr.split('-').map(function(p){ return p.trim(); });
+    var startPart = parts[0] || '';
+    var endPart = parts[1] || '';
     
-    if (!timeMatch) {
-        return 0;
+    // Detect AM/PM on start
+    var startMatch = startPart.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)/i);
+    var endMatch = endPart.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)/i);
+    
+    // If start doesn't have am/pm but end does, append end's period to start for parsing.
+    if (!startMatch && endMatch) {
+        startPart = startPart + (endMatch[3] ? endMatch[3].toLowerCase() : '');
+        startMatch = startPart.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)/i);
     }
     
-    var hours = parseInt(timeMatch[1]);
-    var minutes = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
-    var period = timeMatch[3].toLowerCase();
+    if (!startMatch) {
+        // Try to parse plain hour:minute without am/pm as local time day morning (fallback)
+        var genericMatch = parts[0].match(/(\d{1,2}):?(\d{2})?/);
+        if (!genericMatch) return 0;
+        var hours = parseInt(genericMatch[1]);
+        var minutes = genericMatch[2] ? parseInt(genericMatch[2]) : 0;
+        return hours * 60 + minutes;
+    }
+    
+    var hours = parseInt(startMatch[1]);
+    var minutes = startMatch[2] ? parseInt(startMatch[2]) : 0;
+    var period = startMatch[3].toLowerCase();
     
     if (period === 'pm' && hours !== 12) {
         hours += 12;
@@ -826,18 +845,22 @@ function updateMessageCarousel() {
     }
 }
 
-// Drop indicator management
+// Drop indicator / placeholder management
 function showDropIndicator(container, y) {
     var indicator = container.querySelector('.drop-indicator');
     if (!indicator) return;
     
+    // Get card elements (exclude any placeholder)
     var cards = Array.from(container.children).filter(function(el) {
-        return el.classList.contains('timetable-card') || el.classList.contains('assessment-card');
+        return (el.classList && (el.classList.contains('timetable-card') || el.classList.contains('assessment-card')));
     });
     
     if (cards.length === 0) {
-        indicator.style.top = '0px';
+        // Empty container: place indicator at top
+        container.appendChild(indicator);
         indicator.classList.add('active');
+        indicator._dropIndex = 0;
+        container._dropIndex = 0;
         return;
     }
     
@@ -858,18 +881,25 @@ function showDropIndicator(container, y) {
     });
     
     if (closestCard) {
-        var rect = closestCard.getBoundingClientRect();
-        var containerRect = container.getBoundingClientRect();
-        var position;
-        
         if (insertBefore) {
-            position = rect.top - containerRect.top - 2;
+            container.insertBefore(indicator, closestCard);
         } else {
-            position = rect.bottom - containerRect.top + 10;
+            // Insert after: if nextSibling exists and is the drop indicator, put after that
+            var next = closestCard.nextSibling;
+            if (next) {
+                container.insertBefore(indicator, next);
+            } else {
+                container.appendChild(indicator);
+            }
         }
         
-        indicator.style.top = position + 'px';
         indicator.classList.add('active');
+        // compute drop index
+        var children = Array.from(container.children).filter(function(el){ return el !== indicator && el.classList && (el.classList.contains('timetable-card') || el.classList.contains('assessment-card')); });
+        var index = children.indexOf(closestCard);
+        if (!insertBefore) index = index + 1;
+        container._dropIndex = index;
+        indicator._dropIndex = index;
     }
 }
 
@@ -877,6 +907,10 @@ function hideDropIndicator(container) {
     var indicator = container.querySelector('.drop-indicator');
     if (indicator) {
         indicator.classList.remove('active');
+        delete indicator._dropIndex;
+    }
+    if (container) {
+        delete container._dropIndex;
     }
 }
 
@@ -884,12 +918,12 @@ function renderTimetable() {
     var days = ['Monday', 'Tuesday', 'Thursday', 'Friday'];
     days.forEach(function(day) {
         var container = document.getElementById(day.toLowerCase() + '-cards');
-        var cards = Array.from(container.children).filter(function(el) {
-            return el.classList.contains('timetable-card');
+        if (!container) return;
+        // Remove existing timetable-card nodes
+        var existingCards = Array.from(container.children).filter(function(el) {
+            return el.classList && el.classList.contains('timetable-card');
         });
-        cards.forEach(function(card) {
-            card.remove();
-        });
+        existingCards.forEach(function(card) { card.remove(); });
         
         var sortedCards = sortCardsByTime(timetable[day]);
         var indicator = container.querySelector('.drop-indicator');
@@ -902,14 +936,16 @@ function renderTimetable() {
             }
         });
         
+        // Setup drag/drop handlers on container
         container.addEventListener('dragover', function(e) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
+            try { e.dataTransfer.dropEffect = 'move'; } catch (err) {}
             showDropIndicator(container, e.clientY);
         });
         
         container.addEventListener('dragleave', function(e) {
-            if (e.target === container || e.target.classList.contains('drop-indicator')) {
+            // If leaving to an element outside the container, hide
+            if (e.target === container || e.target.classList && e.target.classList.contains('drop-indicator')) {
                 hideDropIndicator(container);
             }
         });
@@ -917,26 +953,39 @@ function renderTimetable() {
         container.addEventListener('drop', function(e) {
             e.preventDefault();
             hideDropIndicator(container);
-            handleDrop(e, day);
+            handleDrop(e, day, container);
         });
     });
 }
 
-function handleDrop(e, day) {
-    if (!draggedCard || !draggedFromDay) return;
+function handleDrop(e, day, container) {
+    if (!draggedCard || (typeof container._dropIndex === 'undefined')) return;
     
-    if (draggedFromDay !== day) {
-        saveToHistory();
-        timetable[draggedFromDay] = timetable[draggedFromDay].filter(function(c) { 
-            return c.id !== draggedCard.id; 
-        });
-        
-        timetable[day] = sortCardsByTime(timetable[day].concat([draggedCard]));
-        
-        saveState();
-        renderTimetable();
-        logEvent('Card moved', draggedCard.title + ' moved from ' + draggedFromDay + ' to ' + day, new Date().toLocaleString());
+    saveToHistory();
+    var targetIndex = container._dropIndex;
+    var sourceDay = draggedFromDay;
+    // Find and remove from source
+    var removedCard = null;
+    if (sourceDay && timetable[sourceDay]) {
+        var srcIndex = timetable[sourceDay].findIndex(function(c){ return c.id === draggedCard.id; });
+        if (srcIndex !== -1) {
+            removedCard = timetable[sourceDay].splice(srcIndex, 1)[0];
+            // If moving within same day and srcIndex < targetIndex, targetIndex should shift left by 1
+            if (sourceDay === day && srcIndex < targetIndex) {
+                targetIndex = targetIndex - 1;
+            }
+        }
     }
+    // If not found in timetable (shouldn't happen), try to use draggedCard directly
+    var cardToInsert = removedCard || draggedCard;
+    
+    // Insert into destination at targetIndex
+    timetable[day].splice(targetIndex, 0, cardToInsert);
+    // Re-sort keeping pinned priority but preserve inserted order (we will re-sort except pins)
+    timetable[day] = sortCardsByTime(timetable[day]);
+    saveState();
+    renderTimetable();
+    logEvent('Card moved', cardToInsert.title + ' moved from ' + (sourceDay || 'unknown') + ' to ' + day, new Date().toLocaleString());
     
     draggedCard = null;
     draggedFromDay = null;
@@ -948,12 +997,48 @@ function createCardElement(card, day) {
     if (card.pinned) cardEl.classList.add('pinned-card');
     cardEl.draggable = true;
     
-    var pinIcon = card.pinned ? 
-        '<svg class="icon-small" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"/></svg>' :
-        '<svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"/></svg>';
+    // Build actions wrapper
+    var actions = document.createElement('div');
+    actions.className = 'card-header-actions';
     
-    cardEl.innerHTML = '<div class="card-header-actions"><button class="duplicate-btn" onclick="event.stopPropagation(); duplicateCard(\'' + card.id + '\', \'' + day + '\')" title="Duplicate card"><svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button><button class="pin-btn" onclick="event.stopPropagation(); togglePin(\'' + card.id + '\', \'' + day + '\')" title="' + (card.pinned ? 'Unpin' : 'Pin') + ' card">' + pinIcon + '</button></div><div class="card-time">' + card.time + '</div><div class="card-title">' + card.title + '</div><div class="card-location">' + card.location + '</div>';
+    var dupBtn = document.createElement('button');
+    dupBtn.className = 'duplicate-btn';
+    dupBtn.title = 'Duplicate card';
+    dupBtn.innerHTML = '<svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+    dupBtn.addEventListener('click', function(evt) {
+        evt.stopPropagation();
+        duplicateCard(card.id, day);
+    });
+    actions.appendChild(dupBtn);
     
+    var pinBtn = document.createElement('button');
+    pinBtn.className = 'pin-btn';
+    pinBtn.title = 'Pin/unpin';
+    pinBtn.innerHTML = card.pinned ? '<svg class="icon-small" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3"></path></svg>' : '<svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3"></path></svg>';
+    pinBtn.addEventListener('click', function(evt) {
+        evt.stopPropagation();
+        togglePin(card.id, day);
+    });
+    actions.appendChild(pinBtn);
+    
+    cardEl.appendChild(actions);
+    
+    var timeEl = document.createElement('div');
+    timeEl.className = 'card-time';
+    timeEl.textContent = card.time || '';
+    cardEl.appendChild(timeEl);
+    
+    var titleEl = document.createElement('div');
+    titleEl.className = 'card-title';
+    titleEl.textContent = card.title || '';
+    cardEl.appendChild(titleEl);
+    
+    var locEl = document.createElement('div');
+    locEl.className = 'card-location';
+    locEl.textContent = card.location || '';
+    cardEl.appendChild(locEl);
+    
+    // Events for dragging
     cardEl.addEventListener('dragstart', function(e) {
         cardEl.classList.add('dragging');
         draggedCard = card;
@@ -966,8 +1051,10 @@ function createCardElement(card, day) {
         dragGhost.appendChild(ghost);
         dragGhost.classList.remove('hidden');
         
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setDragImage(dragGhost, 0, 0);
+        try {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setDragImage(dragGhost, 0, 0);
+        } catch (err) {}
     });
     
     cardEl.addEventListener('drag', function(e) {
@@ -996,12 +1083,11 @@ function renderAssessments() {
     var statuses = ['todo', 'inprogress', 'extension', 'completed'];
     statuses.forEach(function(status) {
         var container = document.getElementById(status + '-assessments');
-        var cards = Array.from(container.children).filter(function(el) {
-            return el.classList.contains('assessment-card');
+        if (!container) return;
+        var existingCards = Array.from(container.children).filter(function(el) {
+            return el.classList && el.classList.contains('assessment-card');
         });
-        cards.forEach(function(card) {
-            card.remove();
-        });
+        existingCards.forEach(function(card) { card.remove(); });
         
         var sorted = sortAssessmentsByUrgency(assessments[status]);
         var indicator = container.querySelector('.drop-indicator');
@@ -1016,12 +1102,12 @@ function renderAssessments() {
         
         container.addEventListener('dragover', function(e) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
+            try { e.dataTransfer.dropEffect = 'move'; } catch (err) {}
             showDropIndicator(container, e.clientY);
         });
         
         container.addEventListener('dragleave', function(e) {
-            if (e.target === container || e.target.classList.contains('drop-indicator')) {
+            if (e.target === container || e.target.classList && e.target.classList.contains('drop-indicator')) {
                 hideDropIndicator(container);
             }
         });
@@ -1030,19 +1116,26 @@ function renderAssessments() {
             e.preventDefault();
             hideDropIndicator(container);
             
-            if (!draggedAssessment || !draggedFromStatus) return;
-            
-            if (draggedFromStatus !== status) {
-                saveToHistory();
-                assessments[draggedFromStatus] = assessments[draggedFromStatus].filter(function(a) { 
-                    return a.id !== draggedAssessment.id; 
-                });
-                assessments[status] = sortAssessmentsByUrgency(assessments[status].concat([draggedAssessment]));
-                saveState();
-                renderAssessments();
-                logEvent('Assessment moved', draggedAssessment.title + ' moved from ' + draggedFromStatus + ' to ' + status, new Date().toLocaleString());
+            if (!draggedAssessment || (typeof container._dropIndex === 'undefined')) return;
+            saveToHistory();
+            var targetIndex = container._dropIndex;
+            var sourceStatus = draggedFromStatus;
+            var removed = null;
+            if (sourceStatus && assessments[sourceStatus]) {
+                var srcIndex = assessments[sourceStatus].findIndex(function(a){ return a.id === draggedAssessment.id; });
+                if (srcIndex !== -1) {
+                    removed = assessments[sourceStatus].splice(srcIndex, 1)[0];
+                    if (sourceStatus === status && srcIndex < targetIndex) {
+                        targetIndex = targetIndex - 1;
+                    }
+                }
             }
-            
+            var toInsert = removed || draggedAssessment;
+            assessments[status].splice(targetIndex, 0, toInsert);
+            assessments[status] = sortAssessmentsByUrgency(assessments[status]);
+            saveState();
+            renderAssessments();
+            logEvent('Assessment moved', toInsert.title + ' moved from ' + (sourceStatus || 'unknown') + ' to ' + status, new Date().toLocaleString());
             draggedAssessment = null;
             draggedFromStatus = null;
         });
@@ -1054,9 +1147,38 @@ function createAssessmentElement(assessment, status) {
     var urgency = calculateUrgency(assessment.dueDate);
     cardEl.className = 'assessment-card urgency-' + urgency;
     cardEl.draggable = true;
-    var dueDate = new Date(assessment.dueDate).toLocaleDateString('en-AU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    var dueDate = '';
+    try {
+        dueDate = new Date(assessment.dueDate).toLocaleDateString('en-AU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch (err) {}
     
-    cardEl.innerHTML = '<div class="card-header-actions"><button class="duplicate-btn" onclick="event.stopPropagation(); duplicateAssessment(\'' + assessment.id + '\', \'' + status + '\')" title="Duplicate assessment"><svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div><div class="card-title">' + assessment.title + '</div><div class="card-course">' + assessment.course + '</div><div class="card-due">Due: ' + dueDate + '</div>';
+    var actions = document.createElement('div');
+    actions.className = 'card-header-actions';
+    var dupBtn = document.createElement('button');
+    dupBtn.className = 'duplicate-btn';
+    dupBtn.title = 'Duplicate assessment';
+    dupBtn.innerHTML = '<svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+    dupBtn.addEventListener('click', function(evt) {
+        evt.stopPropagation();
+        duplicateAssessment(assessment.id, status);
+    });
+    actions.appendChild(dupBtn);
+    cardEl.appendChild(actions);
+    
+    var titleEl = document.createElement('div');
+    titleEl.className = 'card-title';
+    titleEl.textContent = assessment.title;
+    cardEl.appendChild(titleEl);
+    
+    var courseEl = document.createElement('div');
+    courseEl.className = 'card-course';
+    courseEl.textContent = assessment.course;
+    cardEl.appendChild(courseEl);
+    
+    var dueEl = document.createElement('div');
+    dueEl.className = 'card-due';
+    dueEl.textContent = dueDate;
+    cardEl.appendChild(dueEl);
     
     cardEl.addEventListener('dragstart', function(e) {
         cardEl.classList.add('dragging');
@@ -1070,8 +1192,10 @@ function createAssessmentElement(assessment, status) {
         dragGhost.appendChild(ghost);
         dragGhost.classList.remove('hidden');
         
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setDragImage(dragGhost, 0, 0);
+        try {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setDragImage(dragGhost, 0, 0);
+        } catch (err) {}
     });
     
     cardEl.addEventListener('drag', function(e) {
@@ -1106,7 +1230,28 @@ function renderChangelog() {
     changelog.forEach(function(entry) {
         var entryEl = document.createElement('div');
         entryEl.className = 'changelog-item';
-        entryEl.innerHTML = '<div class="changelog-header"><div><div class="changelog-time">' + entry.timestamp + '</div><div class="changelog-text">' + entry.summary + '</div></div><svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="changelog-details">' + entry.details + '</div>';
+        var header = document.createElement('div');
+        header.className = 'changelog-header';
+        var left = document.createElement('div');
+        var time = document.createElement('div');
+        time.className = 'changelog-time';
+        time.textContent = entry.timestamp;
+        var text = document.createElement('div');
+        text.className = 'changelog-text';
+        text.textContent = entry.summary;
+        left.appendChild(time);
+        left.appendChild(text);
+        header.appendChild(left);
+        var expandIcon = document.createElement('svg');
+        expandIcon.className = 'expand-icon';
+        expandIcon.setAttribute('viewBox', '0 0 24 24');
+        expandIcon.innerHTML = '<path d="M6 9l6 6 6-6"></path>';
+        header.appendChild(expandIcon);
+        entryEl.appendChild(header);
+        var details = document.createElement('div');
+        details.className = 'changelog-details';
+        details.textContent = entry.details;
+        entryEl.appendChild(details);
         entryEl.addEventListener('click', function() {
             entryEl.classList.toggle('expanded');
         });

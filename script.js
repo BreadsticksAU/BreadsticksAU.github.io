@@ -3,7 +3,7 @@
 // and set APPSCRIPT_TOKEN locally to the SECRET_TOKEN you set in Apps Script.
 // DO NOT commit APPSCRIPT_TOKEN into a public repo.
 
-const WEB_APP_URL = 'https://script.google.com/a/macros/umail.usq.edu.au/s/AKfycbwVLqYPnT-R28m-s1-Q2qLbvkbIg6NK6QShGoSfzxt3ut8sY8RlCa0cUPJk1apSHux72Q/exec';
+const WEB_APP_URL = 'https://monumental-gelato-a678ff.netlify.app/';
 const APPSCRIPT_TOKEN = 'REPLACE_WITH_SECRET_TOKEN';
 
 // -------------------- Initial data / state --------------------
@@ -535,11 +535,8 @@ function setupSharedResourcesUI() {
       progressEl.textContent = 'Uploading...';
       fetch(WEB_APP_URL, {
         method: 'POST',
-        credentials: 'include',
-        // IMPORTANT: Send google cookies so Apps Script sees signed-in user headers:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          // No Token Needed bc the web app is domain-restricted.
           filename: pendingFile.name,
           mimeType: pendingFile.type,
           base64: base64,
@@ -570,7 +567,7 @@ function loadSharedList() {
   const listEl = document.getElementById('sharedList');
   if (!listEl) return;
   listEl.innerHTML = 'Loading...';
-  fetch(WEB_APP_URL, { method: 'GET', credentials: 'include' })
+  fetch(WEB_APP_URL, { method: 'GET' })
     .then(r => r.json())
     .then(json => {
       if (!json.success) {

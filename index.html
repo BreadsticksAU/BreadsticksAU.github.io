@@ -202,6 +202,18 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Flash Review (new) -->
+                <div id="flashReview" class="flash-review">
+                    <div class="flash-review-header">
+                        <h2>Flash Review</h2>
+                        <div class="flash-review-actions">
+                            <button id="addFlashcardBtn" class="btn-primary" title="Add a flashcard">+ Add a Flashcard</button>
+                        </div>
+                    </div>
+                    <p class="muted" style="margin-top:6px; margin-bottom:12px; color:var(--text-secondary);">Quickly review short Q&A flashcards. Tap a card to start the 5s reveal timer.</p>
+                    <div id="flashcardsList" class="flashcards-list"></div>
+                </div>
             </div>
 
             <!-- Assessments Content -->
@@ -412,6 +424,39 @@
                     <textarea id="editAssessmentNotes" class="form-input" rows="3"></textarea>
                 </div>
                 <button id="deleteAssessment" class="btn-danger full-width">Delete Assessment</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Flashcard Modal -->
+    <div id="addFlashcardModal" class="modal hidden">
+        <div class="modal-content flash-modal-content">
+            <div class="modal-header">
+                <h3>Add Flashcard</h3>
+                <button id="closeAddFlashcardModal" class="close-btn" title="Close">
+                    <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Course</label>
+                    <input type="text" id="flashCourse" class="form-input" placeholder="e.g. Bioscience">
+                </div>
+                <div class="form-group">
+                    <label>Question</label>
+                    <textarea id="flashQuestion" class="form-input" rows="3" placeholder="Enter a short question..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Answer</label>
+                    <textarea id="flashAnswer" class="form-input" rows="2" placeholder="Enter the answer..."></textarea>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button id="saveFlashcardBtn" class="btn-primary">Save Flashcard</button>
+                    <button id="cancelFlashcardBtn" class="btn-danger">Cancel</button>
+                </div>
             </div>
         </div>
     </div>

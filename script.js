@@ -30,6 +30,7 @@ var timetable = {};
 var assessments = {};
 var importantMessages = [];
 var changelog = [];
+var flashcards = [];
 var currentTheme = 'light';
 var sidebarCollapsed = false;
 var editingCard = null;
@@ -46,9 +47,7 @@ var draggedFromStatus = null;
 var dragGhost = null;
 var carouselInterval = null;
 var currentMessageIndex = 0;
-var userIdleTimeout = null;
 var lastActivityTime = Date.now();
-var currentDropIndicator = null;
 
 // Safe localStorage wrapper
 function safeLocalStorageSet(key, value) {
@@ -88,11 +87,11 @@ document.addEventListener('DOMContentLoaded', function() {
     renderAssessments();
     renderChangelog();
     renderMessages();
+    renderFlashcards();
     updateMessageCarousel();
     startCarousel();
     updateUndoRedoButtons();
     dragGhost = document.getElementById('dragGhost');
-    setupActivityTracking();
     applyTheme();
     logEvent('Page loaded', 'Application started', new Date().toLocaleString());
 });
@@ -275,6 +274,24 @@ function setupEventListeners() {
             logEvent('Messages cleared', 'All important messages were deleted', new Date().toLocaleString());
         }
     });
+
+    // Flashcard UI events
+    var addFlashBtn = document.getElementById('addFlashcardBtn');
+    if (addFlashBtn) {
+        addFlashBtn.addEventListener('click', openAddFlashcardModal);
+    }
+    var closeAddFlash = document.getElementById('closeAddFlashcardModal');
+    if (closeAddFlash) closeAddFlash.addEventListener('click', closeAddFlashcardModal);
+    var cancelFlash = document.getElementById('cancelFlashcardBtn');
+    if (cancelFlash) cancelFlash.addEventListener('click', closeAddFlashcardModal);
+    var saveFlash = document.getElementById('saveFlashcardBtn');
+    if (saveFlash) saveFlash.addEventListener('click', saveFlashcard);
+    var addFlashModal = document.getElementById('addFlashcardModal');
+    if (addFlashModal) {
+        addFlashModal.addEventListener('click', function(e) {
+            if (e.target === addFlashModal) closeAddFlashcardModal();
+        });
+    }
 }
 
 // Add card function
@@ -551,6 +568,17 @@ function loadState() {
     } else {
         changelog = [];
     }
+
+    saved = safeLocalStorageGet('universityFlashcards');
+    if (saved) {
+        try {
+            flashcards = JSON.parse(saved);
+        } catch (e) {
+            flashcards = [];
+        }
+    } else {
+        flashcards = [];
+    }
     
     currentTheme = safeLocalStorageGet('universityTheme') || 'light';
     sidebarCollapsed = safeLocalStorageGet('sidebarCollapsed') === 'true';
@@ -566,6 +594,7 @@ function saveState() {
     safeLocalStorageSet('universityAssessments', JSON.stringify(assessments));
     safeLocalStorageSet('universityMessages', JSON.stringify(importantMessages));
     safeLocalStorageSet('universityChangelog', JSON.stringify(changelog));
+    safeLocalStorageSet('universityFlashcards', JSON.stringify(flashcards));
     safeLocalStorageSet('universityTheme', currentTheme);
     safeLocalStorageSet('sidebarCollapsed', sidebarCollapsed);
 }
@@ -631,7 +660,8 @@ function saveToHistory() {
     var state = {
         timetable: JSON.parse(JSON.stringify(timetable)),
         assessments: JSON.parse(JSON.stringify(assessments)),
-        messages: JSON.parse(JSON.stringify(importantMessages))
+        messages: JSON.parse(JSON.stringify(importantMessages)),
+        flashcards: JSON.parse(JSON.stringify(flashcards))
     };
     
     undoHistory = undoHistory.slice(0, historyIndex + 1);
@@ -653,10 +683,12 @@ function undo() {
         timetable = JSON.parse(JSON.stringify(state.timetable));
         assessments = JSON.parse(JSON.stringify(state.assessments));
         importantMessages = JSON.parse(JSON.stringify(state.messages));
+        flashcards = JSON.parse(JSON.stringify(state.flashcards || []));
         saveState();
         renderTimetable();
         renderAssessments();
         renderMessages();
+        renderFlashcards();
         updateMessageCarousel();
         updateUndoRedoButtons();
         logEvent('Undo action', 'Reverted to previous state', new Date().toLocaleString());
@@ -670,10 +702,12 @@ function redo() {
         timetable = JSON.parse(JSON.stringify(state.timetable));
         assessments = JSON.parse(JSON.stringify(state.assessments));
         importantMessages = JSON.parse(JSON.stringify(state.messages));
+        flashcards = JSON.parse(JSON.stringify(state.flashcards || []));
         saveState();
         renderTimetable();
         renderAssessments();
         renderMessages();
+        renderFlashcards();
         updateMessageCarousel();
         updateUndoRedoButtons();
         logEvent('Redo action', 'Restored next state', new Date().toLocaleString());
@@ -689,6 +723,7 @@ function updateUndoRedoButtons() {
 function parseTime(timeStr) {
     // Accept ranges like "6:15-7:45am", "1:45-3:15pm", "10:00am-12:00pm", or single times.
     // If start part lacks am/pm, inherit am/pm from end part when possible.
+    if (!timeStr || typeof timeStr !== 'string') return 0;
     var parts = timeStr.split('-').map(function(p){ return p.trim(); });
     var startPart = parts[0] || '';
     var endPart = parts[1] || '';
@@ -792,16 +827,6 @@ function logEvent(summary, details, timestamp) {
 }
 
 // Carousel management
-function setupActivityTracking() {
-    var activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-    
-    activityEvents.forEach(function(event) {
-        document.addEventListener(event, function() {
-            lastActivityTime = Date.now();
-        }, true);
-    });
-}
-
 function startCarousel() {
     if (carouselInterval) {
         clearInterval(carouselInterval);
@@ -884,7 +909,6 @@ function showDropIndicator(container, y) {
         if (insertBefore) {
             container.insertBefore(indicator, closestCard);
         } else {
-            // Insert after: if nextSibling exists and is the drop indicator, put after that
             var next = closestCard.nextSibling;
             if (next) {
                 container.insertBefore(indicator, next);
@@ -894,7 +918,6 @@ function showDropIndicator(container, y) {
         }
         
         indicator.classList.add('active');
-        // compute drop index
         var children = Array.from(container.children).filter(function(el){ return el !== indicator && el.classList && (el.classList.contains('timetable-card') || el.classList.contains('assessment-card')); });
         var index = children.indexOf(closestCard);
         if (!insertBefore) index = index + 1;
@@ -944,7 +967,6 @@ function renderTimetable() {
         });
         
         container.addEventListener('dragleave', function(e) {
-            // If leaving to an element outside the container, hide
             if (e.target === container || e.target.classList && e.target.classList.contains('drop-indicator')) {
                 hideDropIndicator(container);
             }
@@ -981,7 +1003,7 @@ function handleDrop(e, day, container) {
     
     // Insert into destination at targetIndex
     timetable[day].splice(targetIndex, 0, cardToInsert);
-    // Re-sort keeping pinned priority but preserve inserted order (we will re-sort except pins)
+    // Re-sort keeping pinned priority
     timetable[day] = sortCardsByTime(timetable[day]);
     saveState();
     renderTimetable();
@@ -1014,7 +1036,7 @@ function createCardElement(card, day) {
     var pinBtn = document.createElement('button');
     pinBtn.className = 'pin-btn';
     pinBtn.title = 'Pin/unpin';
-    pinBtn.innerHTML = card.pinned ? '<svg class="icon-small" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3"></path></svg>' : '<svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3"></path></svg>';
+    pinBtn.innerHTML = '<svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3"></path></svg>';
     pinBtn.addEventListener('click', function(evt) {
         evt.stopPropagation();
         togglePin(card.id, day);
@@ -1059,8 +1081,8 @@ function createCardElement(card, day) {
     
     cardEl.addEventListener('drag', function(e) {
         if (e.clientX === 0 && e.clientY === 0) return;
-        dragGhost.style.left = e.clientX + 10 + 'px';
-        dragGhost.style.top = e.clientY + 10 + 'px';
+        dragGhost.style.left = (e.clientX + 10) + 'px';
+        dragGhost.style.top = (e.clientY + 10) + 'px';
     });
     
     cardEl.addEventListener('dragend', function() {
@@ -1200,8 +1222,8 @@ function createAssessmentElement(assessment, status) {
     
     cardEl.addEventListener('drag', function(e) {
         if (e.clientX === 0 && e.clientY === 0) return;
-        dragGhost.style.left = e.clientX + 10 + 'px';
-        dragGhost.style.top = e.clientY + 10 + 'px';
+        dragGhost.style.left = (e.clientX + 10) + 'px';
+        dragGhost.style.top = (e.clientY + 10) + 'px';
     });
     
     cardEl.addEventListener('dragend', function() {
@@ -1258,3 +1280,179 @@ function renderChangelog() {
         container.appendChild(entryEl);
     });
 }
+
+/* ----- FLASHCARDS ----- */
+
+function openAddFlashcardModal() {
+    document.getElementById('flashCourse').value = '';
+    document.getElementById('flashQuestion').value = '';
+    document.getElementById('flashAnswer').value = '';
+    document.getElementById('addFlashcardModal').classList.remove('hidden');
+}
+
+function closeAddFlashcardModal() {
+    document.getElementById('addFlashcardModal').classList.add('hidden');
+}
+
+function saveFlashcard() {
+    var course = document.getElementById('flashCourse').value.trim();
+    var question = document.getElementById('flashQuestion').value.trim();
+    var answer = document.getElementById('flashAnswer').value.trim();
+    if (!course || !question || !answer) {
+        alert('Please fill course, question and answer.');
+        return;
+    }
+    saveToHistory();
+    var fc = {
+        id: 'flash_' + Date.now(),
+        course: course,
+        question: question,
+        answer: answer
+    };
+    flashcards.push(fc);
+    saveState();
+    renderFlashcards();
+    closeAddFlashcardModal();
+    logEvent('Flashcard added', course + ': ' + question, new Date().toLocaleString());
+}
+
+function deleteFlashcard(id) {
+    saveToHistory();
+    flashcards = flashcards.filter(function(f) { return f.id !== id; });
+    saveState();
+    renderFlashcards();
+    logEvent('Flashcard deleted', id, new Date().toLocaleString());
+}
+
+function renderFlashcards() {
+    var container = document.getElementById('flashcardsList');
+    if (!container) return;
+    container.innerHTML = '';
+    if (flashcards.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-secondary);">No flashcards yet. Click "Add a Flashcard" to get started.</p>';
+        return;
+    }
+    flashcards.forEach(function(f) {
+        var card = document.createElement('div');
+        card.className = 'flash-card';
+        card.setAttribute('data-id', f.id);
+        
+        var top = document.createElement('div');
+        top.className = 'course';
+        top.textContent = f.course;
+        card.appendChild(top);
+        
+        var q = document.createElement('div');
+        q.className = 'question';
+        q.textContent = f.question;
+        card.appendChild(q);
+        
+        var a = document.createElement('div');
+        a.className = 'answer';
+        a.textContent = f.answer;
+        card.appendChild(a);
+        
+        var controls = document.createElement('div');
+        controls.className = 'controls';
+        var del = document.createElement('button');
+        del.className = 'small-btn';
+        del.style.background = 'transparent';
+        del.style.color = '#ef4444';
+        del.textContent = 'Delete';
+        del.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (confirm('Delete this flashcard?')) {
+                deleteFlashcard(f.id);
+            }
+        });
+        controls.appendChild(del);
+        card.appendChild(controls);
+        
+        // overlay used while waiting for reveal
+        var overlay = document.createElement('div');
+        overlay.className = 'reveal-overlay';
+        overlay.style.display = 'none';
+        overlay.textContent = 'Tap to reveal';
+        card.appendChild(overlay);
+        
+        var revealState = { waiting: false, revealed: false, timeoutId: null, remaining: 0 };
+        
+        card.addEventListener('click', function() {
+            if (card.classList.contains('revealed')) {
+                // already revealed; do nothing
+                return;
+            }
+            if (revealState.waiting) return;
+            // start 5s countdown
+            revealState.waiting = true;
+            var wait = 5;
+            overlay.style.display = 'flex';
+            overlay.innerHTML = '<div>Revealing in <strong class="countdown">' + wait + '</strong>s</div>';
+            revealState.remaining = wait;
+            revealState.timeoutId = setInterval(function() {
+                revealState.remaining--;
+                var el = overlay.querySelector('.countdown');
+                if (el) el.textContent = revealState.remaining;
+                if (revealState.remaining <= 0) {
+                    clearInterval(revealState.timeoutId);
+                    revealState.waiting = false;
+                    revealState.revealed = true;
+                    overlay.style.display = 'none';
+                    card.classList.add('revealed');
+                }
+            }, 1000);
+        });
+        
+        container.appendChild(card);
+    });
+}
+
+/* ----- END FLASHCARDS ----- */
+
+function renderTimetable() {
+    // ensure timetable keys exist for days
+    var days = ['Monday', 'Tuesday', 'Thursday', 'Friday'];
+    days.forEach(function(day) {
+        if (!timetable[day]) timetable[day] = [];
+    });
+    var daysEl = days;
+    daysEl.forEach(function(day) {
+        var container = document.getElementById(day.toLowerCase() + '-cards');
+        if (!container) return;
+        // Remove existing timetable-card nodes
+        var existingCards = Array.from(container.children).filter(function(el) {
+            return el.classList && el.classList.contains('timetable-card');
+        });
+        existingCards.forEach(function(card) { card.remove(); });
+        
+        var sortedCards = sortCardsByTime(timetable[day]);
+        var indicator = container.querySelector('.drop-indicator');
+        sortedCards.forEach(function(card) {
+            var cardEl = createCardElement(card, day);
+            if (indicator) {
+                container.insertBefore(cardEl, indicator);
+            } else {
+                container.appendChild(cardEl);
+            }
+        });
+    });
+}
+
+// Messages / carousel helper already defined earlier
+
+// Render assessments function called earlier
+
+// Render changelog function already defined earlier
+
+// Activity tracking
+function setupActivityTracking() {
+    var activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    
+    activityEvents.forEach(function(event) {
+        document.addEventListener(event, function() {
+            lastActivityTime = Date.now();
+        }, true);
+    });
+}
+
+// Initial render calls already done at DOMContentLoaded

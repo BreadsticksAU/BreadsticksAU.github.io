@@ -203,7 +203,7 @@
                     </div>
                 </div>
 
-                <!-- Flash Review (existing) -->
+                <!-- Flash Review (new) -->
                 <div id="flashReview" class="flash-review">
                     <div class="flash-review-header">
                         <h2>Flash Review</h2>
@@ -213,23 +213,6 @@
                     </div>
                     <p class="muted" style="margin-top:6px; margin-bottom:12px; color:var(--text-secondary);">Quickly review short Q&A flashcards. Tap a card to start the 5s reveal timer.</p>
                     <div id="flashcardsList" class="flashcards-list"></div>
-                </div>
-
-                <!-- Shared Resources (new) -->
-                <div id="sharedResources" class="flash-review">
-                  <div class="flash-review-header">
-                    <h2>Shared Resources</h2>
-                    <div class="flash-review-actions">
-                      <button id="addResourceBtn" class="btn-primary">Upload a file</button>
-                    </div>
-                  </div>
-                  <p class="muted" style="margin-top:6px; margin-bottom:12px; color:var(--text-secondary);">Drag & drop a file into the area or click Upload. You can edit the friendly Title before uploading.</p>
-
-                  <div id="uploadDropArea" style="border:2px dashed var(--border-color); border-radius:8px; padding:12px; margin-top:12px; min-height:80px; display:flex; align-items:center; justify-content:center; color:var(--text-secondary);">
-                    Drag & drop files here or click Upload
-                  </div>
-
-                  <div id="sharedList" style="margin-top:12px;"></div>
                 </div>
             </div>
 
@@ -298,12 +281,74 @@
                 </div>
             </div>
 
-            <!-- Important Messages, Themes, Settings, Changelog (unchanged, included in your repo) -->
+            <!-- Important Messages Content -->
+            <div id="messagesContent" class="tab-content">
+                <div class="content-box">
+                    <h2>Important Messages</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px;">Messages will cycle on the timetable page every 7 seconds and persist until weekly reset.</p>
+                    <div class="form-group">
+                        <label>New Message</label>
+                        <textarea id="newMessageInput" class="form-input" rows="3" placeholder="Enter an important message..."></textarea>
+                    </div>
+                    <button id="addMessageBtn" class="btn-primary">Add Message</button>
+                    <div id="messagesList" class="messages-list"></div>
+                </div>
+            </div>
+
+            <!-- Themes Content -->
+            <div id="themesContent" class="tab-content">
+                <div class="content-box">
+                    <h2>Themes</h2>
+                    <div class="theme-selector">
+                        <div class="theme-option active" data-theme="light">
+                            <div class="theme-preview light"></div>
+                            <div>
+                                <div style="font-weight: 600;">Light Mode</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Bright and clean</div>
+                            </div>
+                        </div>
+                        <div class="theme-option" data-theme="dark">
+                            <div class="theme-preview dark"></div>
+                            <div>
+                                <div style="font-weight: 600;">Dark Mode</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Easy on the eyes</div>
+                            </div>
+                        </div>
+                        <div class="theme-option" data-theme="vanta">
+                            <div class="theme-preview vanta"></div>
+                            <div>
+                                <div style="font-weight: 600;">Vanta Black</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Pure darkness</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Content -->
+            <div id="settingsContent" class="tab-content">
+                <div class="content-box">
+                    <h2>Settings</h2>
+                    <div class="settings-actions">
+                        <button id="resetTimetable" class="btn-danger">Reset Timetable</button>
+                        <button id="clearChangelog" class="btn-danger">Clear Changelog</button>
+                        <button id="clearHistory" class="btn-danger">Clear Undo/Redo History</button>
+                        <button id="clearMessages" class="btn-danger">Clear All Messages</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Changelog Content -->
+            <div id="changelogContent" class="tab-content">
+                <div class="content-box">
+                    <h2>Changelog</h2>
+                    <div id="changelogList" class="changelog-list"></div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Modals: editModal, editAssessmentModal, flashcard modal, resource modal are included inline in the repo file (script expects these IDs) -->
-    <!-- Edit modals -->
+    <!-- Edit Timetable Card Modal -->
     <div id="editModal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
@@ -349,6 +394,7 @@
         </div>
     </div>
 
+    <!-- Edit Assessment Modal -->
     <div id="editAssessmentModal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
@@ -413,19 +459,6 @@
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- Upload Resource Modal -->
-    <div id="resourceModal" class="modal hidden">
-      <div class="modal-content">
-        <div class="modal-header"><h3>Upload file</h3><button id="closeResourceModal" class="close-btn">✕</button></div>
-        <div class="modal-body">
-          <div id="resourcePreview"></div>
-          <div class="form-group"><label>Title</label><input id="resourceTitle" class="form-input"/></div>
-          <div style="display:flex; gap:8px;"><button id="confirmUploadBtn" class="btn-primary">Upload</button><button id="cancelUploadBtn" class="btn-danger">Cancel</button></div>
-          <div id="uploadProgress" style="margin-top:8px;"></div>
-        </div>
-      </div>
     </div>
 
     <!-- Drag Ghost -->

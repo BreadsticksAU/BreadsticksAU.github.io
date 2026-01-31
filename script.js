@@ -2,28 +2,29 @@
 const INITIAL_TIMETABLE = {
     Monday: [
         { id: 'm1', time: '6:15-7:45am', title: 'Bus: Toowoomba → Ipswich (B1)', location: 'Arrive 7:45am', color: 'blue', notes: '', pinned: false },
-        { id: 'm2', time: '10:00am-12:00pm', title: 'NSC1501 – Bioscience', location: 'M102 Teaching Room', color: 'green', notes: '', pinned: false },
+        { id: 'm2', time: '10:00am-12:00pm', title: 'NSC1501 – Tutorial', location: 'I116A Teaching Room (Ipswich)', color: 'green', notes: '', pinned: false },
         { id: 'm3', time: '1:45-3:15pm', title: 'Bus: Ipswich → Toowoomba (B2)', location: 'Depart 1:45pm', color: 'blue', notes: '', pinned: false }
     ],
     Tuesday: [
         { id: 't1', time: '6:15-7:45am', title: 'Bus: Toowoomba → Ipswich (B1)', location: 'Arrive 7:45am', color: 'blue', notes: '', pinned: false },
-        { id: 't2', time: '8:00-10:00am', title: 'PMC1101 – Public Health', location: 'J131 Lecture Theatre', color: 'yellow', notes: '', pinned: false },
-        { id: 't3', time: '10:00am-12:00pm', title: 'PMC1110 – Intro to Paramedicine', location: 'J131 Lecture Theatre', color: 'red', notes: '', pinned: false },
-        { id: 't4', time: '3:00-5:00pm', title: 'PMC1110 – Intro to Paramedicine', location: 'I113 Teaching Room', color: 'red', notes: '', pinned: false },
+        { id: 't2', time: '8:00-10:00am', title: 'PMC1101 – Class Contact Time', location: 'J131 Lecture Theatre (Ipswich)', color: 'yellow', notes: '', pinned: false },
+        { id: 't3', time: '10:00am-12:00pm', title: 'PMC1110 – Class Contact Time', location: 'J131 Lecture Theatre (Ipswich)', color: 'red', notes: '', pinned: false },
+        { id: 't4', time: '3:00-5:00pm', title: 'PMC1110 – Workshop', location: 'M101 Teaching Room (Ipswich)', color: 'red', notes: '', pinned: false },
         { id: 't5', time: '5:15-6:45pm', title: 'Bus: Ipswich → Toowoomba (B1)', location: 'Depart 5:15pm', color: 'blue', notes: '', pinned: false }
     ],
     Thursday: [
         { id: 'th1', time: '6:15-7:45am', title: 'Bus: Toowoomba → Ipswich (B1)', location: 'Arrive 7:45am', color: 'blue', notes: '', pinned: false },
-        { id: 'th2', time: '8:00am-12:00pm', title: 'PMC1110 – Intro to Paramedicine', location: 'I306 Simulated House', color: 'red', notes: '', pinned: false },
-        { id: 'th3', time: '2:00-3:00pm', title: 'PMC1101 – Public Health', location: 'I206 Tutorial Room', color: 'yellow', notes: '', pinned: false },
+        { id: 'th2', time: '8:00am-12:00pm', title: 'PMC1110 – Laboratory', location: 'I306 Simulated House (Ipswich)', color: 'red', notes: '', pinned: false },
+        { id: 'th3', time: '2:00-3:00pm', title: 'PMC1101 – Tutorial', location: 'I206 Tutorial Room (Ipswich)', color: 'yellow', notes: '', pinned: false },
         { id: 'th4', time: '5:15-6:45pm', title: 'Bus: Ipswich → Toowoomba (B1)', location: 'Depart 5:15pm', color: 'blue', notes: '', pinned: false }
     ],
     Friday: [
         { id: 'f1', time: '10:00am-12:00pm', title: 'Bus: Toowoomba → Springfield (B2)', location: 'Arrive 12pm', color: 'blue', notes: '', pinned: false },
-        { id: 'f2', time: '1:00-4:00pm', title: 'NSC1501 – Bioscience', location: 'B406 Multi-Purpose Lab (Springfield)', color: 'green', notes: '', pinned: false },
+        { id: 'f2', time: '1:00-4:00pm', title: 'NSC1501 – Bioscience', location: 'B406 Multi Purpose Lab (Springfield)', color: 'green', notes: '', pinned: false },
         { id: 'f3', time: '4:45-6:45pm', title: 'Bus: Springfield → Toowoomba (B1)', location: 'Depart 4:45pm', color: 'blue', notes: '', pinned: false }
     ]
 };
+
 
 // State management
 var timetable = {};
